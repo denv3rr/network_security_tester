@@ -1,12 +1,21 @@
 # Network Security Tester (NST)
 
 ## Overview
-This is a multi-platform Python tool designed for **network security assessment**. It supports:
+This is a multi-platform Python tool designed for **network security assessment**.
+
+Supports:
 - **Wi-Fi scanning** (detects available networks, security types)
-- **Port scanning** (checks for commonly open ports)
+- **Port scanning** (checks for open ports)
+  - (feel free to add other ports to check as needed at the beginning of ``port_scanner.py`` shown below):
+  - ```
+    # Check common open ports:
+    # SSH, HTTP, HTTPS, RDP, DNS, Web Proxy
+    COMMON_PORTS = [22, 80, 443, 3389, 53, 8080]
+    ``` 
 - **Bluetooth scanning** (detects nearby discoverable devices)
 - **OS security checks** (firewall, updates, antivirus status)
 - **Network metadata scanning** (retrieves local IP, MAC addresses, public IP, and geolocation via BSSID/IP lookup)
+- **Full scan**
 
 This program is for **Windows, Linux, and macOS** and supports both **CLI and GUI** modes depending on use case.
 
@@ -44,28 +53,20 @@ Run the script with specific flags to select modules:
   ```
   python network_security_tester.py --all
   ```
+
+- **Specific combination of scans (select modules):**  
+  ```
+  python network_security_tester.py --wifi --ports --bluetooth
+  ```
   
 - **Wi-Fi scan:**  
   ```
   python network_security_tester.py --wifi
   ```
   
-- **Port scan** (commonly open ports - feel free to add others as needed at the beginning of ``port_scanner.py`` shown below)
+- **Port scan**  
   ```
-  (port_scanner.py)
-  
-  # Check common open ports:
-  # SSH, HTTP, HTTPS, RDP, DNS, Web Proxy
-  COMMON_PORTS = [22, 80, 443, 3389, 53, 8080]
-  ```
-  
-  ```
-  2025-03-11 13:45:00 [INFO] === Running Port Scan on Network Devices ===
-  2025-03-11 13:45:01 [INFO] Scanning 192.168.1.10...
-  2025-03-11 13:45:02 [WARNING] Device 192.168.1.10 has open ports: [22, 80, 443]
-  2025-03-11 13:45:03 [INFO] Scanning 192.168.1.11...
-  2025-03-11 13:45:04 [INFO] Device 192.168.1.11 has no common open ports.
-  2025-03-11 13:45:05 [INFO] === Port Scan Complete ===
+  python network_security_tester.py --ports
   ```
   
 - **Bluetooth scan:**  
@@ -83,7 +84,7 @@ Run the script with specific flags to select modules:
   python network_security_tester.py --network
   ```
 
-### **GUI Usage**
+### **Graphical Interface Usage**
 Run the GUI version using:
 ```
 python network_security_tester.py --gui
@@ -101,6 +102,16 @@ A window will open, allowing you to **select scan modules** via checkboxes and r
 2025-03-11 12:30:03 [INFO] SSID: PublicWiFi, Security: Open, Signal: 43%
 2025-03-11 12:30:03 [WARNING]   [!] Open network detected: PublicWiFi
 2025-03-11 12:30:03 [INFO] 2 networks found (1 open, 0 WEP insecure)
+```
+
+### **Port Scan Output**
+```
+2025-03-11 13:45:00 [INFO] === Running Port Scan on Network Devices ===
+2025-03-11 13:45:01 [INFO] Scanning 192.168.1.10...
+2025-03-11 13:45:02 [WARNING] Device 192.168.1.10 has open ports: [22, 80, 443]
+2025-03-11 13:45:03 [INFO] Scanning 192.168.1.11...
+2025-03-11 13:45:04 [INFO] Device 192.168.1.11 has no common open ports.
+2025-03-11 13:45:05 [INFO] === Port Scan Complete ===
 ```
 
 ### **Bluetooth Scan Output**
@@ -129,7 +140,7 @@ A window will open, allowing you to **select scan modules** via checkboxes and r
 2025-03-11 12:37:04 [INFO] BSSID 00:14:22:01:23:45 | Location: 34.0522° N, 118.2437° W
 ```
 
-### **Full Scan Output (All Modules)**
+### **Full Scan Output (All Modules - Basic Check)**
 ```
 2025-03-11 12:40:00 [INFO] === Full Scan Started ===
 2025-03-11 12:40:01 [INFO] Wi-Fi Scan: 2 networks found (1 open)
