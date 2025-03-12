@@ -9,6 +9,7 @@ from wifi_scan import scan_wifi
 from bluetooth_scan import scan_bluetooth
 from os_security import check_os_security
 from network_scanner import run_network_metadata_scan
+from port_scanner import run_port_scan
 
 def setup_logging():
     """
@@ -26,7 +27,7 @@ def setup_logging():
             logging.StreamHandler()
         ]
     )
-    
+
     # Auto-cleanup logs older than 7 days
     try:
         now = datetime.datetime.now().timestamp()
@@ -46,20 +47,24 @@ def run_full_scan(selected_modules=None):
                     If None or empty, all modules are run.
     """
     results = []
-    if not selected_modules or 'wifi' in selected_modules:
+    
+    if not selected_modules or "wifi" in selected_modules:
         res = scan_wifi()
         results.append(f"Wi-Fi Scan: {res}")
-    if not selected_modules or 'bluetooth' in selected_modules:
+
+    if not selected_modules or "bluetooth" in selected_modules:
         res = scan_bluetooth()
         results.append(f"Bluetooth Scan: {res}")
-    if not selected_modules or 'os' in selected_modules:
+
+    if not selected_modules or "os" in selected_modules:
         res = check_os_security()
         results.append(f"OS Security Check: {res}")
-    if not selected_modules or 'network' in selected_modules:
+
+    if not selected_modules or "network" in selected_modules:
         res = run_network_metadata_scan()
         results.append(f"Network Metadata Scan: {res}")
-    if not selected_modules or "ports" in selected_modules:
-        from port_scanner import run_port_scan
+
+    if not selected_modules or "ports" in selected_modules:  # Run Port Scanner
         res = run_port_scan()
         results.append(f"Port Scan: {res}")
 
