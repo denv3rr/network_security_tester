@@ -3,11 +3,12 @@
 ## Overview
 This is a multi-platform Python tool designed for **network security assessment**. It supports:
 - **Wi-Fi scanning** (detects available networks, security types)
+- **Port scanning** (checks for commonly open ports)
 - **Bluetooth scanning** (detects nearby discoverable devices)
 - **OS security checks** (firewall, updates, antivirus status)
 - **Network metadata scanning** (retrieves local IP, MAC addresses, public IP, and geolocation via BSSID/IP lookup)
 
-NST works on **Windows, Linux, and macOS**, supporting both **CLI and GUI** modes.
+This program is for **Windows, Linux, and macOS** and supports both **CLI and GUI** modes depending on use case.
 
 ---
 
@@ -19,7 +20,7 @@ NST works on **Windows, Linux, and macOS**, supporting both **CLI and GUI** mode
   - `requests` (for API calls)
   - `netifaces` (for network interface details)
 
-To install required packages, run:
+To install the required packages, run:
 ```
 pip install requests netifaces
 ```
@@ -43,18 +44,40 @@ Run the script with specific flags to select modules:
   ```
   python network_security_tester.py --all
   ```
+  
 - **Wi-Fi scan:**  
   ```
   python network_security_tester.py --wifi
   ```
+  
+- **Port scan** (commonly open ports - feel free to add others as needed at the beginning of ``port_scanner.py`` shown below)
+  ```
+  (port_scanner.py)
+  
+  # Check common open ports:
+  # SSH, HTTP, HTTPS, RDP, DNS, Web Proxy
+  COMMON_PORTS = [22, 80, 443, 3389, 53, 8080]
+  ```
+  
+  ```
+  2025-03-11 13:45:00 [INFO] === Running Port Scan on Network Devices ===
+  2025-03-11 13:45:01 [INFO] Scanning 192.168.1.10...
+  2025-03-11 13:45:02 [WARNING] Device 192.168.1.10 has open ports: [22, 80, 443]
+  2025-03-11 13:45:03 [INFO] Scanning 192.168.1.11...
+  2025-03-11 13:45:04 [INFO] Device 192.168.1.11 has no common open ports.
+  2025-03-11 13:45:05 [INFO] === Port Scan Complete ===
+  ```
+  
 - **Bluetooth scan:**  
   ```
   python network_security_tester.py --bluetooth
   ```
+  
 - **OS Security scan:**  
   ```
   python network_security_tester.py --os
   ```
+  
 - **Network metadata scan:**  
   ```
   python network_security_tester.py --network
@@ -147,7 +170,7 @@ sudo apt-get install python3-tk  # (Linux)
 
 ---
 
-## Future Improvements
+## Potential Updates
 - **IPv6 support** for network scanning.
 - **Active connection tracking** for monitoring network activity.
 - **More OS-specific security checks**.
@@ -155,6 +178,14 @@ sudo apt-get install python3-tk  # (Linux)
 ---
 
 ## Contributing
-Feel free to **fork the repository**, submit **pull requests**, or open **issues** for feature suggestions.
+Feel free to **fork the repository**, submit **pull requests**, or open **issues** for suggestions.
 
 ---
+
+<img src="https://user-images.githubusercontent.com/74038190/212284100-561aa473-3905-4a80-b561-0d28506553ee.gif">
+<div align="center">
+  <a href="https://seperet.com">
+    <img src=https://github.com/denv3rr/denv3rr/blob/main/Seperet_Slam_White.gif/>
+  </a>
+</div>
+<img src="https://user-images.githubusercontent.com/74038190/212284100-561aa473-3905-4a80-b561-0d28506553ee.gif">
