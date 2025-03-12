@@ -26,6 +26,7 @@ def setup_logging():
             logging.StreamHandler()
         ]
     )
+    
     # Auto-cleanup logs older than 7 days
     try:
         now = datetime.datetime.now().timestamp()
@@ -57,6 +58,11 @@ def run_full_scan(selected_modules=None):
     if not selected_modules or 'network' in selected_modules:
         res = run_network_metadata_scan()
         results.append(f"Network Metadata Scan: {res}")
+    if not selected_modules or "ports" in selected_modules:
+        from port_scanner import run_port_scan
+        res = run_port_scan()
+        results.append(f"Port Scan: {res}")
+
     # Log consolidated summary
     logging.info("=== Scan Summary ===")
     for line in results:
@@ -70,6 +76,7 @@ def main():
     parser.add_argument("--bluetooth", action="store_true", help="Run Bluetooth scan")
     parser.add_argument("--os", action="store_true", help="Run OS security scan")
     parser.add_argument("--network", action="store_true", help="Run Network Metadata scan")
+    parser.add_argument("--ports", action="store_true", help="Scan network devices for open ports")
     parser.add_argument("--all", action="store_true", help="Run full scan (all modules)")
     parser.add_argument("--gui", action="store_true", help="Launch GUI mode")
     args = parser.parse_args()
