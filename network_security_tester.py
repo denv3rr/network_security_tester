@@ -77,15 +77,18 @@ def run_full_scan(selected_modules=None):
 def main():
     setup_logging()
     parser = argparse.ArgumentParser(description="Network Security Tester (NST) - A multi-platform tool for scanning Wi-Fi networks, Bluetooth devices, OS security settings, and network metadata, including BSSID geolocation and IP tracking. Supports both CLI and GUI modes.")
+    
+    # Available scan options
     parser.add_argument("--wifi", action="store_true", help="Run Wi-Fi scan")
     parser.add_argument("--bluetooth", action="store_true", help="Run Bluetooth scan")
     parser.add_argument("--os", action="store_true", help="Run OS security scan")
     parser.add_argument("--network", action="store_true", help="Run Network Metadata scan")
-    parser.add_argument("--ports", action="store_true", help="Scan network devices for open ports")
+    # Single argument for BOTH DEFAULT AND CUSTOM Port Ranges to avoid conflicts in parser
+    parser.add_argument("--ports", nargs="?", const="1-65535", help="Scan network devices for open ports (default: all ports). Provide a custom range (e.g., '--ports 1-1000').")    
     parser.add_argument("--all", action="store_true", help="Run full scan (all modules)")
     parser.add_argument("--gui", action="store_true", help="Launch GUI mode")
     args = parser.parse_args()
-    
+
     if args.gui:
         from gui_interface import NST_GUI
         import tkinter as tk
@@ -94,7 +97,7 @@ def main():
         root.mainloop()
     else:
         selected_modules = []
-        if args.all or not any([args.wifi, args.bluetooth, args.os, args.network]):
+        if args.all or not any([args.wifi, args.bluetooth, args.os, args.network, args.ports]):
             selected_modules = None  # Run all modules
         else:
             if args.wifi:
@@ -105,9 +108,18 @@ def main():
                 selected_modules.append("os")
             if args.network:
                 selected_modules.append("network")
-        
+            if args.ports:
+                selected_modules.append("ports")
+
         logging.info(f"Network Security Tester started on {platform.system()}")
-        run_full_scan(selected_modules=selected_modules)
+        
+        # Pass port range to the scanning function
+        if args.ports:
+            port_range = args.ports if args.ports else "1-65535"
+            run_full_scan(selected_modules=selected_modules, port_range=port_range)
+        else:
+            run_full_scan(selected_modules=selected_modules)
+        
         logging.info("Network Security Tester scan complete.")
 
 if __name__ == "__main__":

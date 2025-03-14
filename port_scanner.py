@@ -52,10 +52,13 @@ def scan_ports(ip, start_port=1, end_port=65535):
                 if result == 0:  # Connection successful (port is open)
                     service = get_service_banner(ip, port)
                     open_ports[port] = service
-                    logging.info(f"Open port detected: {port} on {ip} | Service: {service}")
+                    logging.info(f"✅ Open port: {port} on {ip} | Service: {service}")
 
         except Exception as e:
             logging.error(f"Error scanning port {port} on {ip}: {e}")
+
+    if open_ports:
+        logging.info(f"Summary for {ip}: {open_ports}")
 
     return open_ports  # Dictionary format {port_number: service_name}
 

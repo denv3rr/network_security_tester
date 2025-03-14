@@ -15,7 +15,7 @@ class NST_GUI:
             "Bluetooth Scan": tk.IntVar(value=1),
             "OS Security Check": tk.IntVar(value=1),
             "Network Metadata Scan": tk.IntVar(value=1),
-            "Port Scan": tk.IntVar(value=1)  # <-- Added Port Scan correctly
+            "Port Scan": tk.IntVar(value=1)
         }
 
         # Generate checkboxes dynamically
