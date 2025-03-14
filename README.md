@@ -44,6 +44,8 @@ NST supports **two execution modes**: **CLI** (command-line) and **GUI** (graphi
 ### **CLI Usage**
 Run the script with specific flags to select modules:
 
+- **Note:** To run a scan **without any logging**, add a ``--silent`` flag.
+
 - **Full scan (all modules):**  
   ```
   python network_security_tester.py --all
