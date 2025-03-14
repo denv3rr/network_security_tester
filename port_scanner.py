@@ -38,6 +38,17 @@ def scan_ports(ip, start_port=1, end_port=65535):
             logging.error(f"Error scanning port {port} on {ip}: {e}")
     return open_ports
 
+def get_service_banner(ip, port):
+    """Attempts to retrieve the banner of a service running on a port."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(1)
+            sock.connect((ip, port))
+            banner = sock.recv(1024).decode().strip()
+            return banner
+    except:
+        return "Unknown Service"
+
 def run_port_scan():
     """Scans all detected network devices for open ports in full range."""
     logging.info("=== Running Full Port Scan on Network Devices ===")
