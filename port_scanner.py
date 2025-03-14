@@ -3,10 +3,6 @@ import logging
 import subprocess
 import platform
 
-# Check common open ports:
-# SSH, HTTP, HTTPS, RDP, DNS, Web Proxy
-COMMON_PORTS = [22, 80, 443, 3389, 53, 8080]
-
 def get_network_devices():
     """Retrieves active network devices on the local network."""
     devices = []
@@ -28,22 +24,23 @@ def get_network_devices():
         logging.error(f"Error retrieving network devices: {e}")
     return list(set(devices))
 
-def scan_ports(ip, ports=COMMON_PORTS):
-    """Scans a given IP address for open ports."""
+def scan_ports(ip, start_port=1, end_port=65535):
+    """Scans a given IP address for all possible ports (1-65535)."""
     open_ports = []
-    for port in ports:
+    for port in range(start_port, end_port + 1):
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-                sock.settimeout(1)
+                sock.settimeout(0.5)  # Timeout reduced for efficiency
                 if sock.connect_ex((ip, port)) == 0:
                     open_ports.append(port)
+                    logging.info(f"Open port detected: {port} on {ip}")
         except Exception as e:
             logging.error(f"Error scanning port {port} on {ip}: {e}")
     return open_ports
 
 def run_port_scan():
-    """Scans all detected network devices for open ports."""
-    logging.info("=== Running Port Scan on Network Devices ===")
+    """Scans all detected network devices for open ports in full range."""
+    logging.info("=== Running Full Port Scan on Network Devices ===")
     devices = get_network_devices()
     if not devices:
         logging.warning("No devices found on the network.")
@@ -51,12 +48,12 @@ def run_port_scan():
 
     results = {}
     for device in devices:
-        logging.info(f"Scanning {device}...")
-        open_ports = scan_ports(device)
+        logging.info(f"Scanning {device} for all ports (1-65535)...")
+        open_ports = scan_ports(device, 1, 65535)  # Scanning full range
         if open_ports:
             logging.warning(f"Device {device} has open ports: {open_ports}")
         else:
-            logging.info(f"Device {device} has no common open ports.")
+            logging.info(f"Device {device} has no open ports detected.")
         results[device] = open_ports
 
     return results
