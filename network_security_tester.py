@@ -87,6 +87,11 @@ def main():
     parser.add_argument("--ports", nargs="?", const="1-65535", help="Scan network devices for open ports (default: all ports). Provide a custom range (e.g., '--ports 1-1000').")    
     parser.add_argument("--all", action="store_true", help="Run full scan (all modules)")
     parser.add_argument("--gui", action="store_true", help="Launch GUI mode")
+    parser.add_argument("--silent", action="store_true", help="Run scan without logging output")
+
+    if args.silent:
+        logging.disable(logging.CRITICAL)  # Turns off all logging
+
     args = parser.parse_args()
 
     if args.gui:
