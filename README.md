@@ -1,23 +1,18 @@
 # Network Security Tester (NST)
 
 ## Overview
-This is a multi-platform Python tool designed for **network security assessment**.
+**Network Security Tester (NST)** is a multi-platform Python tool designed for **network security assessment**.
 
-Supports:
+It supports:
 - **Wi-Fi scanning** (detects available networks, security types)
-- **Port scanning** (checks for open ports)
-  - (feel free to add other ports to check as needed at the beginning of ``port_scanner.py`` shown below):
-  - ```
-    # Check common open ports:
-    # SSH, HTTP, HTTPS, RDP, DNS, Web Proxy
-    COMMON_PORTS = [22, 80, 443, 3389, 53, 8080]
-    ``` 
+- **Port scanning** (scans all 65535 ports & detects running services)
+  - Identifies **most IoT devices, Smart TVs, Printers, and other vulnerable network services**
 - **Bluetooth scanning** (detects nearby discoverable devices)
 - **OS security checks** (firewall, updates, antivirus status)
 - **Network metadata scanning** (retrieves local IP, MAC addresses, public IP, and geolocation via BSSID/IP lookup)
-- **Full scan**
+- **Full scan (runs all security checks)**
 
-This program is for **Windows, Linux, and macOS** and supports both **CLI and GUI** modes depending on use case.
+Works on **Windows, Linux, and macOS**, supporting both **CLI and GUI** modes.
 
 ---
 
@@ -64,9 +59,14 @@ Run the script with specific flags to select modules:
   python network_security_tester.py --wifi
   ```
   
-- **Port scan**  
+- **Port scan (Full range: 1-65535)**  
   ```
   python network_security_tester.py --ports
+  ```
+  
+- **Port scan (Custom range from 1-65535 - e.g., 1-1000)**  
+  ```
+  python network_security_tester.py --ports 1-1000
   ```
   
 - **Bluetooth scan:**  
@@ -106,12 +106,13 @@ A window will open, allowing you to **select scan modules** via checkboxes and r
 
 ### **Port Scan Output**
 ```
-2025-03-11 13:45:00 [INFO] === Running Port Scan on Network Devices ===
-2025-03-11 13:45:01 [INFO] Scanning 192.168.1.10...
-2025-03-11 13:45:02 [WARNING] Device 192.168.1.10 has open ports: [22, 80, 443]
-2025-03-11 13:45:03 [INFO] Scanning 192.168.1.11...
-2025-03-11 13:45:04 [INFO] Device 192.168.1.11 has no common open ports.
-2025-03-11 13:45:05 [INFO] === Port Scan Complete ===
+2025-03-11 13:45:00 [INFO] === Running Full Port Scan on Network Devices ===
+2025-03-11 13:45:01 [INFO] Scanning 192.168.1.10 for all ports (1-65535)...
+2025-03-11 13:45:02 [WARNING] Open port detected: 554 on 192.168.1.10 | Service: RTSP Streaming (Smart TV)
+2025-03-11 13:45:03 [WARNING] Open port detected: 9100 on 192.168.1.25 | Service: HP Printer
+2025-03-11 13:45:04 [INFO] Identified device types for 192.168.1.10: {554: "Smart TV (RTSP)"}
+2025-03-11 13:45:05 [INFO] Identified device types for 192.168.1.25: {9100: "HP Printer"}
+2025-03-11 13:45:06 [INFO] === Port Scan Complete ===
 ```
 
 ### **Bluetooth Scan Output**
@@ -181,10 +182,10 @@ sudo apt-get install python3-tk  # (Linux)
 
 ---
 
-## Potential Updates
-- **IPv6 support** for network scanning.
-- **Active connection tracking** for monitoring network activity.
-- **More OS-specific security checks**.
+## To Add...
+- **IPv6 support**
+- **Active connection tracking**
+- **More OS-specific security checks**
 
 ---
 
