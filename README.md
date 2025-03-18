@@ -1,5 +1,12 @@
 # Network Security Tester (NST)
 
+<div align="center">
+  
+  ![GitHub repo size](https://img.shields.io/github/repo-size/denv3rr/network_security_tester)
+  ![GitHub Created At](https://img.shields.io/github/created-at/denv3rr/network_security_tester)
+  
+</div>
+
 ## Overview
 **Network Security Tester (NST)** is a multi-platform Python tool designed for **network security assessment**.
 
