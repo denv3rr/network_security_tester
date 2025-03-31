@@ -8,9 +8,11 @@
 </div>
 
 ## Overview
+
 **Network Security Tester (NST)** is a multi-platform Python tool designed for **network security assessment**.
 
 It supports:
+
 - **Wi-Fi scanning** (detects available networks, security types)
 - **Port scanning** (scans all 65535 ports & detects running services)
   - Identifies **most IoT devices, Smart TVs, Printers, and other vulnerable network services**
@@ -26,17 +28,20 @@ Works on **Windows, Linux, and macOS**, supporting both **CLI and GUI** modes.
 ## Installation
 
 ### **1. Prerequisites**
+
 - **Python 3.x** must be installed on your system.
 - Required Python modules:
   - `requests` (for API calls)
   - `netifaces` (for network interface details)
 
 To install the required packages, run:
+
 ```
-pip install requests netifaces
+pip install -r requirements.txt
 ```
 
 ### **2. Clone or Download**
+
 ```
 git clone https://github.com/denv3rr/network-security-tester.git
 cd network-security-tester
@@ -49,55 +54,54 @@ cd network-security-tester
 NST supports **two execution modes**: **CLI** (command-line) and **GUI** (graphical).
 
 ### **CLI Usage**
+
 Run the script with specific flags to select modules:
 
-- **Note:** To run a scan **without any logging**, add a ``--silent`` flag.
+- **Note:** To run a scan **without any logging**, add a `--silent` flag.
 
-- **Full scan (all modules):**  
+- **Full scan (all modules):**
+
   ```
   python network_security_tester.py --all
   ```
 
-- **Specific combination of scans (select modules):**  
+- **Specific combination of scans (select modules):**
   ```
   python network_security_tester.py --wifi --ports --bluetooth
   ```
-  
-- **Wi-Fi scan:**  
+- **Wi-Fi scan:**
   ```
   python network_security_tester.py --wifi
   ```
-  
-- **Port scan (Full range: 1-65535)**  
+- **Port scan (Full range: 1-65535)**
   ```
   python network_security_tester.py --ports
   ```
-  
-- **Port scan (Custom range from 1-65535 - e.g., 1-1000)**  
+- **Port scan (Custom range from 1-65535 - e.g., 1-1000)**
   ```
   python network_security_tester.py --ports 1-1000
   ```
-  
-- **Bluetooth scan:**  
+- **Bluetooth scan:**
   ```
   python network_security_tester.py --bluetooth
   ```
-  
-- **OS Security scan:**  
+- **OS Security scan:**
   ```
   python network_security_tester.py --os
   ```
-  
-- **Network metadata scan:**  
+- **Network metadata scan:**
   ```
   python network_security_tester.py --network
   ```
 
 ### **Graphical Interface Usage**
+
 Run the GUI version using:
+
 ```
 python network_security_tester.py --gui
 ```
+
 A window will open, allowing you to **select scan modules** via checkboxes and run scans with a single click.
 
 ---
@@ -105,6 +109,7 @@ A window will open, allowing you to **select scan modules** via checkboxes and r
 ## Example Outputs
 
 ### **Wi-Fi Scan Output**
+
 ```
 2025-03-11 12:30:01 [INFO] Scanning for Wi-Fi networks...
 2025-03-11 12:30:03 [INFO] SSID: HomeNetwork, Security: WPA2-Personal, Signal: 78%
@@ -114,6 +119,7 @@ A window will open, allowing you to **select scan modules** via checkboxes and r
 ```
 
 ### **Port Scan Output**
+
 ```
 2025-03-11 13:45:00 [INFO] === Running Full Port Scan on Network Devices ===
 2025-03-11 13:45:01 [INFO] Scanning 192.168.1.10 for all ports (1-65535)...
@@ -125,6 +131,7 @@ A window will open, allowing you to **select scan modules** via checkboxes and r
 ```
 
 ### **Bluetooth Scan Output**
+
 ```
 2025-03-11 12:32:10 [INFO] Scanning for Bluetooth devices...
 2025-03-11 12:32:12 [INFO] Device: JBL Speaker (MAC: 00:1A:7D:DA:71:13), Signal: -75 dBm
@@ -132,6 +139,7 @@ A window will open, allowing you to **select scan modules** via checkboxes and r
 ```
 
 ### **OS Security Scan Output**
+
 ```
 2025-03-11 12:34:30 [INFO] Checking OS security settings...
 2025-03-11 12:34:32 [INFO] Firewall: Enabled
@@ -141,6 +149,7 @@ A window will open, allowing you to **select scan modules** via checkboxes and r
 ```
 
 ### **Network Metadata Scan Output**
+
 ```
 2025-03-11 12:37:01 [INFO] Public IP: 192.168.1.101
 2025-03-11 12:37:01 [INFO] IP Geolocation: {"city": "Los Angeles", "region": "California", "country": "US"}
@@ -151,6 +160,7 @@ A window will open, allowing you to **select scan modules** via checkboxes and r
 ```
 
 ### **Full Scan Output (All Modules - Basic Check)**
+
 ```
 2025-03-11 12:40:00 [INFO] === Full Scan Started ===
 2025-03-11 12:40:01 [INFO] Wi-Fi Scan: 2 networks found (1 open)
@@ -163,8 +173,10 @@ A window will open, allowing you to **select scan modules** via checkboxes and r
 ---
 
 ## Log Files
+
 NST automatically saves **scan logs** in a `logs/` directory.
-- Logs are named using a timestamp format:  
+
+- Logs are named using a timestamp format:
   ```
   NST_log_YYYYMMDD_HHMMSS.txt
   ```
@@ -182,6 +194,7 @@ NST automatically saves **scan logs** in a `logs/` directory.
 
 **Issue:** GUI doesn't launch  
 **Fix:** Make sure **Tkinter** is installed:
+
 ```
 sudo apt-get install python3-tk  # (Linux)
 ```
@@ -192,6 +205,7 @@ sudo apt-get install python3-tk  # (Linux)
 ---
 
 ## To Add...
+
 - **IPv6 support**
 - **Active connection tracking**
 - **More OS-specific security checks**
@@ -199,6 +213,7 @@ sudo apt-get install python3-tk  # (Linux)
 ---
 
 ## Contributing
+
 Feel free to **fork the repository**, submit **pull requests**, or open **issues** for suggestions.
 
 ---
