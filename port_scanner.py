@@ -78,7 +78,7 @@ def identify_device_type(open_ports):
     
     return detected_devices
 
-def run_port_scan():
+def run_port_scan(start_port=1, end_port=65535):
     """Scans all detected network devices for open ports and identifies possible device types."""
     logging.info("=== Running Full Port Scan on Network Devices ===")
     devices = get_network_devices()
@@ -88,8 +88,8 @@ def run_port_scan():
 
     results = {}
     for device in devices:
-        logging.info(f"Scanning {device} for all ports (1-65535)...")
-        open_ports = scan_ports(device, 1, 65535)  # Scanning full range
+        logging.info(f"Scanning {device} for ports {start_port}-{end_port}...")
+        open_ports = scan_ports(device, start_port, end_port)  # Scanning selected range
         detected_devices = identify_device_type(open_ports)
 
         if open_ports:
