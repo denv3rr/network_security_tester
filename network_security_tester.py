@@ -89,10 +89,10 @@ def main():
     parser.add_argument("--gui", action="store_true", help="Launch GUI mode")
     parser.add_argument("--silent", action="store_true", help="Run scan without logging output")
 
+    args = parser.parse_args()
+    
     if args.silent:
         logging.disable(logging.CRITICAL)  # Turns off all logging
-
-    args = parser.parse_args()
 
     if args.gui:
         from gui_interface import NST_GUI
