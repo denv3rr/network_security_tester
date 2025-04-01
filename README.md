@@ -29,7 +29,38 @@ Works on **Windows, Linux, and macOS**, supporting both **CLI and GUI** modes.
 
 ---
 
-## Installation
+## 🔁 Quick Start Options
+
+> ⚠️ **NOTE:** This program supports one-click or single-command launching to avoid terminal operations. These shortcuts launch **GUI mode** by default. **You can modify them to run CLI commands instead if desired.**
+
+### ✅ Option 1: Cross-Platform Launcher (Recommended)
+Run from terminal (any OS):
+```
+python run.py
+```
+Or double-click `run.py` to launch the GUI.
+
+### 🪟 Option 2: Windows (Double-click Batch File)
+Double-click `run.bat` to launch the GUI automatically.
+
+From terminal:
+```
+run.bat
+```
+
+### 🐧 Option 3: Linux/macOS Shell Script
+Make the file executable first:
+```
+chmod +x run.sh
+```
+Then run with:
+```
+./run.sh
+```
+
+---
+
+## Terminal-Based Installation
 
 ### **1. Prerequisites**
 
@@ -100,7 +131,7 @@ Run the script with specific flags to select modules:
 
 ### **Graphical Interface Usage**
 
-Run the GUI version using:
+Run the GUI version manually using:
 
 ```
 python network_security_tester.py --gui
