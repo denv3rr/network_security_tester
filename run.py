@@ -3,21 +3,20 @@
 import os
 import subprocess
 import sys
-import pkg_resources
+import importlib.util
 
 REQUIRED_PACKAGES = ['requests', 'netifaces']
 
+def is_installed(package_name):
+    return importlib.util.find_spec(package_name) is not None
+
 def check_and_install_requirements():
-    try:
-        pkg_resources.require(REQUIRED_PACKAGES)
-    except pkg_resources.DistributionNotFound:
-        print("[🔧] Installing missing dependencies...")
+    missing = [pkg for pkg in REQUIRED_PACKAGES if not is_installed(pkg)]
+    if missing:
+        print(f"[🔧] Installing missing packages: {', '.join(missing)}")
         subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
-    except pkg_resources.VersionConflict as e:
-        print(f"[⚠️] Version conflict: {e}. Reinstalling...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "-r", "requirements.txt"])
 
 check_and_install_requirements()
 
-# Launch GUI
+# Launch main program (GUI by default)
 os.system("python network_security_tester.py --gui")
