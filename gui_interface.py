@@ -1,12 +1,13 @@
 import tkinter as tk
 from tkinter import ttk  # For themed widgets
-import ttkbootstrap as tb  # For themes
+import ttkbootstrap as tb  # For modern themes
 import threading
 import logging
 import sys
 from io import StringIO
-from network_security_tester import run_full_scan
+from network_security_tester import Scanner # Import the Scanner class instead of run_full_scan
 import netifaces  # For network interface selection
+import queue # Import the queue module
 
 class TextRedirector:
     """Redirects logging output to a Tkinter Text widget."""
@@ -35,6 +36,8 @@ class NST_GUI:
         self.scan_thread = None
         self.output_text = None
         self.progress_bar = None
+        self.scanner = Scanner() # Instantiate the Scanner class
+        self.output_queue = queue.Queue() # Initialize the output queue
 
         self.create_tabs()
 
@@ -85,6 +88,10 @@ class NST_GUI:
 
         # Scan Options (e.g., channels) - Placeholder for future implementation
         tk.Label(tab, text="Wi-Fi Scan Options (Coming Soon)").pack(anchor="w")
+        # Placeholder for channel selection (future)
+        # tk.Label(tab, text="Select Channels:").pack(anchor="w")
+        # self.wifi_channels_var = tk.StringVar(value="All")
+        # tk.Entry(tab, textvariable=self.wifi_channels_var).pack(anchor="w")
 
     def create_bluetooth_tab_content(self, tab):
         """Content for Bluetooth Scan tab."""
@@ -103,12 +110,17 @@ class NST_GUI:
 
         # Port Range Selection
         tk.Label(tab, text="Port Range (e.g., 1-1000):").pack(anchor="w")
-        self.port_range_var = tk.StringVar(value="1-1000")
+        self.port_range_var = tk.StringVar(value="1-65535") # Changed default to full range
         tk.Entry(tab, textvariable=self.port_range_var).pack(anchor="w")
 
         # Progress Bar
         self.progress_bar = ttk.Progressbar(tab, orient="horizontal", length=200, mode="determinate")
         self.progress_bar.pack(pady=10)
+
+        # Placeholder for port presets (future)
+        tk.Label(tab, text="Port Presets (Coming Soon)").pack(anchor="w")
+        # self.port_preset_var = tk.StringVar(value="All")
+        # tk.Combobox(tab, textvariable=self.port_preset_var, values=["All", "Common", "Specific"]).pack(anchor="w")
 
     def create_output_tab_content(self, tab):
         """Content for the Output tab (shared by all scans)."""
@@ -125,11 +137,11 @@ class NST_GUI:
         scrollbar.config(command=self.output_text.yview)
 
         # Redirect stdout/stderr/logging output to GUI
-        sys.stdout = TextRedirector(self.output_text)
-        sys.stderr = TextRedirector(self.output_text)
+        # sys.stdout = TextRedirector(self.output_text) # Remove stdout/stderr redirection
+        # sys.stderr = TextRedirector(self.output_text)
         logging.getLogger().handlers.clear()
         logging.basicConfig(
-            stream=sys.stdout,
+            stream=TextRedirector(self.output_text), # Use TextRedirector for logging only
             level=logging.INFO,
             format="%(asctime)s [%(levelname)s] %(message)s"
         )
@@ -151,6 +163,7 @@ class NST_GUI:
         print("Running selected scans...\n")
         self.scan_thread = threading.Thread(target=self.run_scan_thread, args=(selected_modules,), daemon=True)
         self.scan_thread.start()
+        self.root.after(100, self.update_output) # Start checking the queue
 
     def stop_scan(self):
         """Sets a flag to stop the scan process (logic to be respected in modules)."""
@@ -205,10 +218,17 @@ class NST_GUI:
         if "ports" in selected_modules:
             scan_options["port_range"] = self.port_range_var.get() if hasattr(self, "port_range_var") else "1-65535"
 
-        result = run_full_scan(selected_modules, **scan_options)  # Pass options to run_full_scan
+        # Instantiate Scanner if it doesn't exist
+        if not hasattr(self, 'scanner') or self.scanner is None:
+            self.scanner = Scanner(output_queue=self.output_queue) # Pass the queue to the Scanner
+        else:
+            self.scanner.output_queue = self.output_queue # Update the scanner's queue
+
+        self.scanner.run_scan(selected_modules, **scan_options)  # Call the Scanner's run_scan method
 
         if not self.stop_requested:
-            print(result + "\n")
+            self.output_queue.put(None)  # Signal end of scan to the queue
+
         self.update_progress(0)  # Reset progress bar when scan finishes
 
     def update_progress(self, progress):
@@ -216,6 +236,19 @@ class NST_GUI:
         if self.progress_bar:
             self.progress_bar['value'] = progress
             self.root.update_idletasks()
+
+    def update_output(self):
+        """Updates the output text box with messages from the queue."""
+        try:
+            while True:
+                message = self.output_queue.get_nowait()
+                if message is None:
+                    break  # End of queue
+                self.output_text.insert(tk.END, message + "\n")
+                self.output_text.see(tk.END)
+        except queue.Empty:
+            pass
+        self.root.after(100, self.update_output) # Check the queue again after 100ms
 
 if __name__ == "__main__":
     root = tb.Window(themename="superhero")  # Use a modern theme

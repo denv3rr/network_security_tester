@@ -2,6 +2,7 @@ import platform
 import logging
 import subprocess
 import shutil
+import queue # Import the queue module
 
 def check_command_exists(cmd):
     """Check if a command is available on the system."""
@@ -34,7 +35,7 @@ def run_command_safe(cmd_list):
     except Exception as e:
         return str(e)
 
-def scan_bluetooth():
+def scan_bluetooth(output_queue=None): # Add output_queue
     """
     Scans for nearby Bluetooth devices using OS-specific commands.
     Returns a summary string with device count.
@@ -48,7 +49,10 @@ def scan_bluetooth():
             output = run_command_safe(["powershell", "-Command", "Get-PnpDevice | Where-Object { $_.Class -eq 'Bluetooth' }"])
             for line in output.splitlines():
                 if "Bluetooth" in line:
-                    devices.append(line.strip())
+                    device = line.strip()
+                    devices.append(device)
+                    if output_queue:
+                        output_queue.put(f"  Device: {device}")
         elif current_os == "Linux":
             if not check_command_exists("hcitool"):
                 logging.warning("hcitool is not available. Skipping Bluetooth scan.")
@@ -58,7 +62,10 @@ def scan_bluetooth():
             for line in lines:
                 parts = line.split("\t")
                 if len(parts) >= 2:
-                    devices.append(parts[1])
+                    device = parts[1]
+                    devices.append(device)
+                    if output_queue:
+                        output_queue.put(f"  Device: {device}")
         elif current_os == "Darwin":
             if not check_command_exists("system_profiler"):
                 logging.warning("system_profiler is not available. Skipping Bluetooth scan.")
@@ -66,12 +73,18 @@ def scan_bluetooth():
             output = run_command_safe(["system_profiler", "SPBluetoothDataType"])
             for line in output.split("\n"):
                 if "Device Name" in line:
-                    devices.append(line.split(":")[1].strip())
+                    device = line.split(":")[1].strip()
+                    devices.append(device)
+                    if output_queue:
+                        output_queue.put(f"  Device: {device}")
         else:
             logging.warning(f"Bluetooth scanning is not supported on this OS ({current_os}).")
             return "Bluetooth scan not supported"
     except Exception as e:
         logging.error(f"Error scanning Bluetooth devices: {e}")
         return "Bluetooth scan failed"
-
-    return f"{len(devices)} devices found" if devices else "No Bluetooth devices detected"
+    
+    result = f"{len(devices)} devices found" if devices else "No Bluetooth devices detected"
+    if output_queue:
+        output_queue.put(result)
+    return result

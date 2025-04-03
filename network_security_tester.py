@@ -43,7 +43,7 @@ class Scanner:
     Manages the execution of network security scans.
     """
 
-    def __init__(self, port_range="1-65535"):
+    def __init__(self, port_range="1-65535", output_queue=None): # Add output_queue
         self.port_range = port_range
         self.scan_functions = {
             "wifi": scan_wifi,
@@ -53,6 +53,7 @@ class Scanner:
             "ports": self._run_port_scan  # Use internal method for port scan
         }
         self.results = []
+        self.output_queue = output_queue # Store the output queue
 
     def _run_port_scan(self):
         """Internal method to run port scan with the instance's port range."""
@@ -61,7 +62,7 @@ class Scanner:
         except Exception:
             logging.warning("Invalid port range provided. Defaulting to 1-65535.")
             start_port, end_port = 1, 65535
-        res = run_port_scan(start_port=start_port, end_port=end_port)
+        res = run_port_scan(start_port=start_port, end_port=end_port, output_queue=self.output_queue) # Pass queue
         return f"Port Scan ({start_port}-{end_port}): {res}"
 
     def run_scan(self, selected_modules=None, **scan_options):
@@ -77,11 +78,11 @@ class Scanner:
                 try:
                     # Pass relevant options to each scan function
                     if module == "wifi":
-                        res = self.scan_functions[module](wifi_interface=scan_options.get("wifi_interface"))
+                        res = self.scan_functions[module](wifi_interface=scan_options.get("wifi_interface"), output_queue=self.output_queue) # Pass queue
                     elif module == "ports":
-                        res = self.scan_functions[module](port_range=scan_options.get("port_range"))
+                        res = self.scan_functions[module](port_range=scan_options.get("port_range"), output_queue=self.output_queue) # Pass queue
                     else:
-                        res = self.scan_functions[module]()
+                        res = self.scan_functions[module](output_queue=self.output_queue) # Pass queue
                     self.results.append(f"{module.capitalize()} Scan: {res}")
                 except Exception as e:
                     logging.error(f"Error running {module} scan: {e}")
@@ -141,7 +142,7 @@ def main():
         scan_options = {}
         if args.wifi_interface:
             scan_options["wifi_interface"] = args.wifi_interface
-        scanner.run_scan(selected_modules, scan_options=scan_options) #Pass CLI wifi_interface option
+        scanner.run_scan(selected_modules, scan_options=scan_options)
 
         for result in scanner.get_results():
             logging.info(result)
