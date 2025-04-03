@@ -5,12 +5,13 @@ import threading
 import logging
 import sys
 from io import StringIO
-from network_security_tester import Scanner # Import the Scanner class instead of run_full_scan
+from network_security_tester import Scanner  # Import the Scanner class instead of run_full_scan
 import netifaces  # For network interface selection
-import queue # Import the queue module
+import queue  # Import the queue module
 
 class TextRedirector:
     """Redirects logging output to a Tkinter Text widget."""
+
     def __init__(self, text_widget):
         self.text_widget = text_widget
 
@@ -36,8 +37,15 @@ class NST_GUI:
         self.scan_thread = None
         self.output_text = None
         self.progress_bar = None
-        self.scanner = Scanner() # Instantiate the Scanner class
-        self.output_queue = queue.Queue() # Initialize the output queue
+        self.scanner = Scanner()  # Instantiate the Scanner class
+        self.output_queue = queue.Queue()  # Initialize the output queue
+        self.selected_modules = {  # Track selected modules
+            "wifi": tk.BooleanVar(value=True),
+            "bluetooth": tk.BooleanVar(value=True),
+            "os": tk.BooleanVar(value=True),
+            "network": tk.BooleanVar(value=True),
+            "ports": tk.BooleanVar(value=True),
+        }
 
         self.create_tabs()
 
@@ -77,6 +85,10 @@ class NST_GUI:
     def create_wifi_tab_content(self, tab):
         """Content for Wi-Fi Scan tab."""
 
+        # Module Selection Checkbox
+        wifi_check = tk.Checkbutton(tab, text="Enable Wi-Fi Scan", variable=self.selected_modules["wifi"])
+        wifi_check.pack(anchor="w")
+
         # Network Interface Selection
         interfaces = netifaces.interfaces()
         if interfaces:
@@ -95,22 +107,41 @@ class NST_GUI:
 
     def create_bluetooth_tab_content(self, tab):
         """Content for Bluetooth Scan tab."""
+
+        # Module Selection Checkbox
+        bluetooth_check = tk.Checkbutton(tab, text="Enable Bluetooth Scan", variable=self.selected_modules["bluetooth"])
+        bluetooth_check.pack(anchor="w")
+
         tk.Label(tab, text="Bluetooth Scan Options (None currently)").pack(anchor="w")
 
     def create_os_tab_content(self, tab):
         """Content for OS Security tab."""
+
+        # Module Selection Checkbox
+        os_check = tk.Checkbutton(tab, text="Enable OS Security Scan", variable=self.selected_modules["os"])
+        os_check.pack(anchor="w")
+
         tk.Label(tab, text="OS Security Options (None currently)").pack(anchor="w")
 
     def create_network_tab_content(self, tab):
         """Content for Network Metadata tab."""
+
+        # Module Selection Checkbox
+        network_check = tk.Checkbutton(tab, text="Enable Network Metadata Scan", variable=self.selected_modules["network"])
+        network_check.pack(anchor="w")
+
         tk.Label(tab, text="Network Metadata Options (None currently)").pack(anchor="w")
 
     def create_ports_tab_content(self, tab):
         """Content for Port Scan tab."""
 
+        # Module Selection Checkbox
+        ports_check = tk.Checkbutton(tab, text="Enable Port Scan", variable=self.selected_modules["ports"])
+        ports_check.pack(anchor="w")
+
         # Port Range Selection
         tk.Label(tab, text="Port Range (e.g., 1-1000):").pack(anchor="w")
-        self.port_range_var = tk.StringVar(value="1-65535") # Changed default to full range
+        self.port_range_var = tk.StringVar(value="1-65535")  # Changed default to full range
         tk.Entry(tab, textvariable=self.port_range_var).pack(anchor="w")
 
         # Progress Bar
@@ -141,9 +172,9 @@ class NST_GUI:
         # sys.stderr = TextRedirector(self.output_text)
         logging.getLogger().handlers.clear()
         logging.basicConfig(
-            stream=TextRedirector(self.output_text), # Use TextRedirector for logging only
+            stream=TextRedirector(self.output_text),  # Use TextRedirector for logging only
             level=logging.INFO,
-            format="%(asctime)s [%(levelname)s] %(message)s"
+            format="%(asctime)s [%(levelname)s] %(message)s",
         )
 
         # Button Frame (Run/Stop/Clear)
@@ -158,12 +189,12 @@ class NST_GUI:
         """Triggers a scan with selected modules in a background thread."""
 
         self.stop_requested = False
-        selected_modules = self.get_selected_modules()
-        print("[DEBUG] Selected modules:", selected_modules)
+        selected_modules_list = self.get_selected_modules()
+        print("[DEBUG] Selected modules:", selected_modules_list)
         print("Running selected scans...\n")
-        self.scan_thread = threading.Thread(target=self.run_scan_thread, args=(selected_modules,), daemon=True)
+        self.scan_thread = threading.Thread(target=self.run_scan_thread, args=(selected_modules_list,), daemon=True)
         self.scan_thread.start()
-        self.root.after(100, self.update_output) # Start checking the queue
+        self.root.after(100, self.update_output)  # Start checking the queue
 
     def stop_scan(self):
         """Sets a flag to stop the scan process (logic to be respected in modules)."""
@@ -186,23 +217,11 @@ class NST_GUI:
         self.output_text.delete(1.0, tk.END)
 
     def get_selected_modules(self):
-        """Determines which modules are selected based on tab."""
+        """Determines which modules are selected based on checkboxes."""
 
-        selected_modules = []
-        current_tab = self.notebook.select()
-        tab_text = self.notebook.tab(current_tab, "text")
-
-        if tab_text == "Wi-Fi Scan":
-            selected_modules.append("wifi")
-        elif tab_text == "Bluetooth Scan":
-            selected_modules.append("bluetooth")
-        elif tab_text == "OS Security":
-            selected_modules.append("os")
-        elif tab_text == "Network Data":
-            selected_modules.append("network")
-        elif tab_text == "Port Scan":
-            selected_modules.append("ports")
-
+        selected_modules = [
+            module for module, var in self.selected_modules.items() if var.get()
+        ]
         return selected_modules
 
     def run_scan_thread(self, selected_modules):
@@ -214,15 +233,19 @@ class NST_GUI:
         # Pass options from GUI
         scan_options = {}
         if "wifi" in selected_modules:
-            scan_options["wifi_interface"] = self.wifi_interface_var.get() if hasattr(self, "wifi_interface_var") else None
+            scan_options["wifi_interface"] = (
+                self.wifi_interface_var.get() if hasattr(self, "wifi_interface_var") else None
+            )
         if "ports" in selected_modules:
-            scan_options["port_range"] = self.port_range_var.get() if hasattr(self, "port_range_var") else "1-65535"
+            scan_options["port_range"] = (
+                self.port_range_var.get() if hasattr(self, "port_range_var") else "1-65535"
+            )
 
         # Instantiate Scanner if it doesn't exist
-        if not hasattr(self, 'scanner') or self.scanner is None:
-            self.scanner = Scanner(output_queue=self.output_queue) # Pass the queue to the Scanner
+        if not hasattr(self, "scanner") or self.scanner is None:
+            self.scanner = Scanner(output_queue=self.output_queue)  # Pass the queue to the Scanner
         else:
-            self.scanner.output_queue = self.output_queue # Update the scanner's queue
+            self.scanner.output_queue = self.output_queue  # Update the scanner's queue
 
         self.scanner.run_scan(selected_modules, **scan_options)  # Call the Scanner's run_scan method
 
@@ -234,7 +257,7 @@ class NST_GUI:
     def update_progress(self, progress):
         """Updates the progress bar in the Port Scan tab."""
         if self.progress_bar:
-            self.progress_bar['value'] = progress
+            self.progress_bar["value"] = progress
             self.root.update_idletasks()
 
     def update_output(self):
@@ -248,7 +271,7 @@ class NST_GUI:
                 self.output_text.see(tk.END)
         except queue.Empty:
             pass
-        self.root.after(100, self.update_output) # Check the queue again after 100ms
+        self.root.after(100, self.update_output)  # Check the queue again after 100ms
 
 if __name__ == "__main__":
     root = tb.Window(themename="superhero")  # Use a modern theme
