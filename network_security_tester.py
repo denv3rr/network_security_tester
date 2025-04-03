@@ -43,7 +43,7 @@ class Scanner:
     Manages the execution of network security scans.
     """
 
-    def __init__(self, port_range="1-65535", output_queue=None): # Add output_queue
+    def __init__(self, port_range="1-65535", output_queue=None):  # Add output_queue
         self.port_range = port_range
         self.scan_functions = {
             "wifi": scan_wifi,
@@ -53,16 +53,20 @@ class Scanner:
             "ports": self._run_port_scan  # Use internal method for port scan
         }
         self.results = []
-        self.output_queue = output_queue # Store the output queue
+        self.output_queue = output_queue  # Store the output queue
 
-    def _run_port_scan(self):
+    def _run_port_scan(self, port_range="1-65535"):  # Add port_range parameter with default
         """Internal method to run port scan with the instance's port range."""
         try:
-            start_port, end_port = map(int, self.port_range.split("-"))
+            start_port, end_port = map(int, port_range.split("-"))
         except Exception:
             logging.warning("Invalid port range provided. Defaulting to 1-65535.")
             start_port, end_port = 1, 65535
-        res = run_port_scan(start_port=start_port, end_port=end_port, output_queue=self.output_queue) # Pass queue
+        res = run_port_scan(
+            start_port=start_port,
+            end_port=end_port,
+            output_queue=self.output_queue
+        )  # Pass queue
         return f"Port Scan ({start_port}-{end_port}): {res}"
 
     def run_scan(self, selected_modules=None, **scan_options):
@@ -78,11 +82,18 @@ class Scanner:
                 try:
                     # Pass relevant options to each scan function
                     if module == "wifi":
-                        res = self.scan_functions[module](wifi_interface=scan_options.get("wifi_interface"), output_queue=self.output_queue) # Pass queue
+                        res = self.scan_functions[module](
+                            wifi_interface=scan_options.get("wifi_interface"),
+                            output_queue=self.output_queue
+                        )  # Pass queue
                     elif module == "ports":
-                        res = self.scan_functions[module](port_range=scan_options.get("port_range"), output_queue=self.output_queue) # Pass queue
+                        res = self.scan_functions[module](
+                            port_range=scan_options.get("port_range"),
+                            output_queue=self.output_queue
+                        )  # Pass queue
+                        #print(f"DEBUG: port_range in run_scan: {scan_options.get('port_range')}")
                     else:
-                        res = self.scan_functions[module](output_queue=self.output_queue) # Pass queue
+                        res = self.scan_functions[module](output_queue=self.output_queue)  # Pass queue
                     self.results.append(f"{module.capitalize()} Scan: {res}")
                 except Exception as e:
                     logging.error(f"Error running {module} scan: {e}")
@@ -95,18 +106,23 @@ class Scanner:
 def main():
     setup_logging()
     parser = argparse.ArgumentParser(description="Network Security Tester (NST) - A multi-platform tool for scanning Wi-Fi networks, Bluetooth devices, OS security settings, and network metadata, including BSSID geolocation and IP tracking. Supports both CLI and GUI modes.")
-    
+
     # Available scan options
     parser.add_argument("--wifi", action="store_true", help="Run Wi-Fi scan")
     parser.add_argument("--bluetooth", action="store_true", help="Run Bluetooth scan")
     parser.add_argument("--os", action="store_true", help="Run OS security scan")
     parser.add_argument("--network", action="store_true", help="Run Network Metadata scan")
     # Single argument for BOTH DEFAULT AND CUSTOM Port Ranges to avoid conflicts in parser
-    parser.add_argument("--ports", nargs="?", const="1-65535", help="Scan network devices for open ports (default: all ports). Provide a custom range (e.g., '--ports 1-1000').")    
+    parser.add_argument(
+        "--ports",
+        nargs="?",
+        const="1-65535",
+        help="Scan network devices for open ports (default: all ports). Provide a custom range (e.g., '--ports 1-1000').",
+    )
     parser.add_argument("--all", action="store_true", help="Run full scan (all modules)")
     parser.add_argument("--gui", action="store_true", help="Launch GUI mode")
     parser.add_argument("--silent", action="store_true", help="Run scan without logging output")
-    parser.add_argument("--wifi_interface", help="Specify the Wi-Fi interface to use for scanning") #CLI option for wifi_interface
+    parser.add_argument("--wifi_interface", help="Specify the Wi-Fi interface to use for scanning")  # CLI option for wifi_interface
 
     args = parser.parse_args()
 
@@ -116,6 +132,7 @@ def main():
     if args.gui:
         from gui_interface import NST_GUI
         import tkinter as tk
+
         root = tk.Tk()
         app = NST_GUI(root)
         root.mainloop()
@@ -136,7 +153,7 @@ def main():
                 selected_modules.append("ports")
 
         logging.info(f"Network Security Tester started on {platform.system()}")
-        
+
         # Initialize and run the scanner
         scanner = Scanner(port_range=args.ports if args.ports else "1-65535")
         scan_options = {}
@@ -146,7 +163,7 @@ def main():
 
         for result in scanner.get_results():
             logging.info(result)
-        
+
         logging.info("Network Security Tester scan complete.")
 
 if __name__ == "__main__":

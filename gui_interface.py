@@ -52,6 +52,11 @@ class NST_GUI:
     def create_tabs(self):
         """Creates tabs for each scan module."""
 
+        # Run Tab (Global Scan Selection)
+        run_tab = tb.Frame(self.notebook, padding=10)
+        self.notebook.add(run_tab, text="Run")
+        self.create_run_tab_content(run_tab)
+
         # Wi-Fi Scan Tab
         wifi_tab = tb.Frame(self.notebook, padding=10)
         self.notebook.add(wifi_tab, text="Wi-Fi Scan")
@@ -82,6 +87,20 @@ class NST_GUI:
         self.notebook.add(output_tab, text="Output")
         self.create_output_tab_content(output_tab)
 
+    def create_run_tab_content(self, tab):
+        """Content for the Run tab (global scan selection)."""
+
+        tk.Label(tab, text="Select Scans to Run:").pack(anchor="w")
+
+        # Create checkboxes for each module
+        tk.Checkbutton(tab, text="Wi-Fi Scan", variable=self.selected_modules["wifi"]).pack(anchor="w")
+        tk.Checkbutton(tab, text="Bluetooth Scan", variable=self.selected_modules["bluetooth"]).pack(anchor="w")
+        tk.Checkbutton(tab, text="OS Security Scan", variable=self.selected_modules["os"]).pack(anchor="w")
+        tk.Checkbutton(tab, text="Network Metadata Scan", variable=self.selected_modules["network"]).pack(anchor="w")
+        tk.Checkbutton(tab, text="Port Scan", variable=self.selected_modules["ports"]).pack(anchor="w")
+
+        tk.Button(tab, text="▶ Run All Selected Scans", command=self.start_scan).pack(pady=10)
+
     def create_wifi_tab_content(self, tab):
         """Content for Wi-Fi Scan tab."""
 
@@ -105,6 +124,8 @@ class NST_GUI:
         # self.wifi_channels_var = tk.StringVar(value="All")
         # tk.Entry(tab, textvariable=self.wifi_channels_var).pack(anchor="w")
 
+        tk.Button(tab, text="▶ Run Wi-Fi Scan", command=self.run_single_wifi_scan).pack(pady=10)
+
     def create_bluetooth_tab_content(self, tab):
         """Content for Bluetooth Scan tab."""
 
@@ -113,6 +134,8 @@ class NST_GUI:
         bluetooth_check.pack(anchor="w")
 
         tk.Label(tab, text="Bluetooth Scan Options (None currently)").pack(anchor="w")
+
+        tk.Button(tab, text="▶ Run Bluetooth Scan", command=self.run_single_bluetooth_scan).pack(pady=10)
 
     def create_os_tab_content(self, tab):
         """Content for OS Security tab."""
@@ -123,6 +146,8 @@ class NST_GUI:
 
         tk.Label(tab, text="OS Security Options (None currently)").pack(anchor="w")
 
+        tk.Button(tab, text="▶ Run OS Security Scan", command=self.run_single_os_scan).pack(pady=10)
+
     def create_network_tab_content(self, tab):
         """Content for Network Metadata tab."""
 
@@ -131,6 +156,8 @@ class NST_GUI:
         network_check.pack(anchor="w")
 
         tk.Label(tab, text="Network Metadata Options (None currently)").pack(anchor="w")
+
+        tk.Button(tab, text="▶ Run Network Metadata Scan", command=self.run_single_network_scan).pack(pady=10)
 
     def create_ports_tab_content(self, tab):
         """Content for Port Scan tab."""
@@ -152,6 +179,8 @@ class NST_GUI:
         tk.Label(tab, text="Port Presets (Coming Soon)").pack(anchor="w")
         # self.port_preset_var = tk.StringVar(value="All")
         # tk.Combobox(tab, textvariable=self.port_preset_var, values=["All", "Common", "Specific"]).pack(anchor="w")
+
+        tk.Button(tab, text="▶ Run Port Scan", command=self.run_single_port_scan).pack(pady=10)
 
     def create_output_tab_content(self, tab):
         """Content for the Output tab (shared by all scans)."""
@@ -181,7 +210,6 @@ class NST_GUI:
         button_frame = tk.Frame(tab)
         button_frame.pack(pady=5)
 
-        tk.Button(button_frame, text="▶ Run Scan", command=self.start_scan).pack(side="left", padx=10)
         tk.Button(button_frame, text="■ Stop Scan", command=self.stop_scan).pack(side="left")
         tk.Button(button_frame, text="🧹 Clear Output", command=self.clear_output).pack(side="left", padx=5)
 
@@ -272,6 +300,40 @@ class NST_GUI:
         except queue.Empty:
             pass
         self.root.after(100, self.update_output)  # Check the queue again after 100ms
+
+    def run_single_wifi_scan(self):
+        """Runs only the Wi-Fi scan."""
+        self.notebook.select(6)  # Switch to Output tab
+        self.start_scan_single(["wifi"])
+
+    def run_single_bluetooth_scan(self):
+        """Runs only the Bluetooth scan."""
+        self.notebook.select(6)  # Switch to Output tab
+        self.start_scan_single(["bluetooth"])
+
+    def run_single_os_scan(self):
+        """Runs only the OS Security scan."""
+        self.notebook.select(6)  # Switch to Output tab
+        self.start_scan_single(["os"])
+
+    def run_single_network_scan(self):
+        """Runs only the Network Metadata scan."""
+        self.notebook.select(6)  # Switch to Output tab
+        self.start_scan_single(["network"])
+
+    def run_single_port_scan(self):
+        """Runs only the Port scan."""
+        self.notebook.select(6)  # Switch to Output tab
+        self.start_scan_single(["ports"])
+
+    def start_scan_single(self, module_list):
+        """Starts a scan for a single module."""
+
+        self.stop_requested = False
+        print(f"[DEBUG] Running single scan: {module_list[0]}")
+        self.scan_thread = threading.Thread(target=self.run_scan_thread, args=(module_list,), daemon=True)
+        self.scan_thread.start()
+        self.root.after(100, self.update_output)  # Start checking the queue
 
 if __name__ == "__main__":
     root = tb.Window(themename="superhero")  # Use a modern theme
