@@ -64,9 +64,10 @@ class Scanner:
         res = run_port_scan(start_port=start_port, end_port=end_port)
         return f"Port Scan ({start_port}-{end_port}): {res}"
 
-    def run_scan(self, selected_modules=None):
+    def run_scan(self, selected_modules=None, **scan_options):
         """
         Executes the selected scans. If no modules are selected, runs all.
+        Accepts scan_options for module-specific arguments.
         """
         if not selected_modules:
             selected_modules = self.scan_functions.keys()  # Run all if none selected
@@ -74,7 +75,13 @@ class Scanner:
         for module in selected_modules:
             if module in self.scan_functions:
                 try:
-                    res = self.scan_functions[module]()
+                    # Pass relevant options to each scan function
+                    if module == "wifi":
+                        res = self.scan_functions[module](wifi_interface=scan_options.get("wifi_interface"))
+                    elif module == "ports":
+                        res = self.scan_functions[module](port_range=scan_options.get("port_range"))
+                    else:
+                        res = self.scan_functions[module]()
                     self.results.append(f"{module.capitalize()} Scan: {res}")
                 except Exception as e:
                     logging.error(f"Error running {module} scan: {e}")
@@ -98,6 +105,7 @@ def main():
     parser.add_argument("--all", action="store_true", help="Run full scan (all modules)")
     parser.add_argument("--gui", action="store_true", help="Launch GUI mode")
     parser.add_argument("--silent", action="store_true", help="Run scan without logging output")
+    parser.add_argument("--wifi_interface", help="Specify the Wi-Fi interface to use for scanning") #CLI option for wifi_interface
 
     args = parser.parse_args()
 
@@ -130,7 +138,10 @@ def main():
         
         # Initialize and run the scanner
         scanner = Scanner(port_range=args.ports if args.ports else "1-65535")
-        scanner.run_scan(selected_modules)
+        scan_options = {}
+        if args.wifi_interface:
+            scan_options["wifi_interface"] = args.wifi_interface
+        scanner.run_scan(selected_modules, scan_options=scan_options) #Pass CLI wifi_interface option
 
         for result in scanner.get_results():
             logging.info(result)

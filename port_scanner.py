@@ -110,13 +110,20 @@ def identify_device_type(open_ports):
     
     return detected_devices
 
-def run_port_scan(start_port=1, end_port=65535):
+def run_port_scan(start_port=1, end_port=65535, port_range="1-65535"):
     """Scans all detected network devices for open ports and identifies possible device types."""
     logging.info("=== Running Full Port Scan on Network Devices ===")
     devices = get_network_devices()
     if not devices:
         logging.warning("No devices found on the network.")
         return "No devices found"
+
+    # Override start/end ports if a custom range is provided
+    try:
+        start_port, end_port = map(int, port_range.split("-"))
+    except ValueError:
+        logging.warning(f"Invalid port range '{port_range}'. Using default 1-65535.")
+        start_port, end_port = 1, 65535
 
     results = {}
     for device in devices:

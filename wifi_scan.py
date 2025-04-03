@@ -34,7 +34,7 @@ def run_command_safe(cmd_list):
     except Exception as e:
         return str(e)
 
-def scan_wifi():
+def scan_wifi(wifi_interface=None):  # Add wifi_interface parameter
     """
     Scans for available Wi-Fi networks using OS-specific commands.
     Returns a summary string with network count and security statuses.
@@ -50,7 +50,10 @@ def scan_wifi():
                 if "SSID" in line:
                     networks.append({"ssid": line.split(":")[1].strip()})
         elif current_os == "Linux":
-            output = run_command_safe(["nmcli", "-f", "SSID,SECURITY,SIGNAL", "dev", "wifi"])
+            if wifi_interface:
+                output = run_command_safe(["nmcli", "-f", "SSID,SECURITY,SIGNAL", "dev", "wifi", "ifname", wifi_interface])
+            else:
+                output = run_command_safe(["nmcli", "-f", "SSID,SECURITY,SIGNAL", "dev", "wifi"])
             lines = output.split("\n")[1:]
             for line in lines:
                 parts = line.split()
