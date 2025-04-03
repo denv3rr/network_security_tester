@@ -5,12 +5,44 @@ import logging
 import json
 import netifaces
 import subprocess
+import shutil
+
+def check_command_exists(cmd):
+    """Check if a command is available on the system."""
+    return shutil.which(cmd) is not None
+
+def run_command(cmd_list, check=True):
+    """
+    Executes a system command and returns the output.
+    Raises subprocess.CalledProcessError if the command fails (when check=True).
+    """
+    try:
+        result = subprocess.run(cmd_list, capture_output=True, text=True, check=check)
+        return result.stdout.strip()
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Command '{' '.join(cmd_list)}' failed: {e}")
+        raise  # Re-raise the exception to be handled by the caller
+    except Exception as e:
+        logging.error(f"Error running command '{' '.join(cmd_list)}': {e}")
+        raise
+
+def run_command_safe(cmd_list):
+    """
+    Executes a system command and returns the output, or an error message if it fails.
+    Does not raise exceptions.
+    """
+    try:
+        return run_command(cmd_list, check=True)
+    except subprocess.CalledProcessError as e:
+        return str(e)  # Return the error message
+    except Exception as e:
+        return str(e)
 
 def get_public_ip():
     """Retrieves the public IP address of the device."""
     try:
         response = requests.get("https://api64.ipify.org?format=json", timeout=5)
-        response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
+        response.raise_for_status()  # Raise HTTPError for bad responses
         ip_data = response.json()
         return ip_data.get("ip", "Unknown")
     except requests.exceptions.RequestException as e:
@@ -41,19 +73,16 @@ def get_bssid_list():
     try:
         current_os = platform.system()
         if current_os == "Windows":
-            output = subprocess.run(["netsh", "wlan", "show", "networks", "mode=Bssid"],
-                                    capture_output=True, text=True, check=True)
-            for line in output.stdout.splitlines():
+            output = run_command_safe(["netsh", "wlan", "show", "networks", "mode=Bssid"])
+            for line in output.splitlines():
                 if "BSSID" in line:
                     bssid_list.append(line.split(":")[1].strip())
         elif current_os == "Linux":
-            output = subprocess.run(["nmcli", "-t", "-f", "BSSID", "dev", "wifi"],
-                                    capture_output=True, text=True, check=True)
-            bssid_list = [line.strip() for line in output.stdout.splitlines()]
+            output = run_command_safe(["nmcli", "-t", "-f", "BSSID", "dev", "wifi"])
+            bssid_list = [line.strip() for line in output.splitlines()]
         elif current_os == "Darwin":
-            output = subprocess.run(["/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport", "-s"],
-                                    capture_output=True, text=True, check=True)
-            lines = output.stdout.split("\n")[1:]
+            output = run_command_safe(["/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport", "-s"])
+            lines = output.split("\n")[1:]
             for line in lines:
                 parts = line.split()
                 if len(parts) > 1:
@@ -61,9 +90,6 @@ def get_bssid_list():
         else:
             logging.warning(f"BSSID scanning is not supported on this OS ({current_os}).")
             return []
-    except subprocess.CalledProcessError as e:
-        logging.error(f"Error running BSSID scan command: {e}")
-        return []
     except Exception as e:
         logging.error(f"Error retrieving BSSID list: {e}")
         return []

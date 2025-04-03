@@ -8,11 +8,30 @@ def check_command_exists(cmd):
     """Check if a command is available on the system."""
     return shutil.which(cmd) is not None
 
-def run_command_safe(cmd_list):
-    """Safely runs a system command and returns its output or error string."""
+def run_command(cmd_list, check=True):
+    """
+    Executes a system command and returns the output.
+    Raises subprocess.CalledProcessError if the command fails (when check=True).
+    """
     try:
-        result = subprocess.run(cmd_list, capture_output=True, text=True, check=True)
-        return result.stdout
+        result = subprocess.run(cmd_list, capture_output=True, text=True, check=check)
+        return result.stdout.strip()
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Command '{' '.join(cmd_list)}' failed: {e}")
+        raise  # Re-raise the exception to be handled by the caller
+    except Exception as e:
+        logging.error(f"Error running command '{' '.join(cmd_list)}': {e}")
+        raise
+
+def run_command_safe(cmd_list):
+    """
+    Executes a system command and returns the output, or an error message if it fails.
+    Does not raise exceptions.
+    """
+    try:
+        return run_command(cmd_list, check=True)
+    except subprocess.CalledProcessError as e:
+        return str(e)  # Return the error message
     except Exception as e:
         return str(e)
 
@@ -21,6 +40,7 @@ def check_os_security():
     Cross-platform OS security check with rich output.
     Supports Windows, Debian/Ubuntu, Fedora/RedHat, Arch, macOS.
     """
+
     current_os = platform.system()
     issues = 0
 

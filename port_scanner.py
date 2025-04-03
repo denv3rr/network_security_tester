@@ -3,9 +3,41 @@ import logging
 import subprocess
 import platform
 import json
+import shutil
 
 # Load known device/service signatures from a local JSON file
 DEVICE_SIGNATURES_FILE = "known_devices.json"
+
+def check_command_exists(cmd):
+    """Check if a command is available on the system."""
+    return shutil.which(cmd) is not None
+
+def run_command(cmd_list, check=True):
+    """
+    Executes a system command and returns the output.
+    Raises subprocess.CalledProcessError if the command fails (when check=True).
+    """
+    try:
+        result = subprocess.run(cmd_list, capture_output=True, text=True, check=check)
+        return result.stdout.strip()
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Command '{' '.join(cmd_list)}' failed: {e}")
+        raise  # Re-raise the exception to be handled by the caller
+    except Exception as e:
+        logging.error(f"Error running command '{' '.join(cmd_list)}': {e}")
+        raise
+
+def run_command_safe(cmd_list):
+    """
+    Executes a system command and returns the output, or an error message if it fails.
+    Does not raise exceptions.
+    """
+    try:
+        return run_command(cmd_list, check=True)
+    except subprocess.CalledProcessError as e:
+        return str(e)  # Return the error message
+    except Exception as e:
+        return str(e)
 
 def get_network_devices():
     """Retrieves active network devices on the local network."""
@@ -13,13 +45,13 @@ def get_network_devices():
     try:
         current_os = platform.system()
         if current_os == "Windows":
-            output = subprocess.run(["arp", "-a"], capture_output=True, text=True, check=True).stdout
+            output = run_command_safe(["arp", "-a"])
             for line in output.split("\n"):
                 parts = line.split()
                 if len(parts) >= 2 and parts[0].count(".") == 3:
                     devices.append(parts[0])
         else:  # Linux/macOS
-            output = subprocess.run(["ip", "neigh"], capture_output=True, text=True, check=True).stdout
+            output = run_command_safe(["ip", "neigh"])
             for line in output.split("\n"):
                 parts = line.split()
                 if len(parts) >= 1 and parts[0].count(".") == 3:
