@@ -1,5 +1,3 @@
-# MAIN
-
 import platform
 import logging
 import datetime
@@ -40,39 +38,51 @@ def setup_logging():
     except Exception as e:
         logging.error(f"Error during log cleanup: {e}")
 
-def run_full_scan(selected_modules=None, port_range="1-65535"):
+class Scanner:
     """
-    Runs a full scan or selected modules and logs the results.
-    selected_modules: list of module names (e.g., ['wifi', 'bluetooth', 'os', 'network']).
-                    If None or empty, all modules are run.
+    Manages the execution of network security scans.
     """
-    results = []
-    
-    if not selected_modules or "wifi" in selected_modules:
-        res = scan_wifi()
-        results.append(f"Wi-Fi Scan: {res}")
-    if not selected_modules or "bluetooth" in selected_modules:
-        res = scan_bluetooth()
-        results.append(f"Bluetooth Scan: {res}")
-    if not selected_modules or "os" in selected_modules:
-        res = check_os_security()
-        results.append(f"OS Security Check: {res}")
-    if not selected_modules or "network" in selected_modules:
-        res = run_network_metadata_scan()
-        results.append(f"Network Metadata Scan: {res}")
-    if not selected_modules or "ports" in selected_modules:
+
+    def __init__(self, port_range="1-65535"):
+        self.port_range = port_range
+        self.scan_functions = {
+            "wifi": scan_wifi,
+            "bluetooth": scan_bluetooth,
+            "os": check_os_security,
+            "network": run_network_metadata_scan,
+            "ports": self._run_port_scan  # Use internal method for port scan
+        }
+        self.results = []
+
+    def _run_port_scan(self):
+        """Internal method to run port scan with the instance's port range."""
         try:
-            start_port, end_port = map(int, port_range.split("-"))
+            start_port, end_port = map(int, self.port_range.split("-"))
         except Exception:
             logging.warning("Invalid port range provided. Defaulting to 1-65535.")
             start_port, end_port = 1, 65535
         res = run_port_scan(start_port=start_port, end_port=end_port)
-        results.append(f"Port Scan ({start_port}-{end_port}): {res}")
+        return f"Port Scan ({start_port}-{end_port}): {res}"
 
-    logging.info("=== Scan Summary ===")
-    for line in results:
-        logging.info(line)
-    return "\n".join(results)
+    def run_scan(self, selected_modules=None):
+        """
+        Executes the selected scans. If no modules are selected, runs all.
+        """
+        if not selected_modules:
+            selected_modules = self.scan_functions.keys()  # Run all if none selected
+
+        for module in selected_modules:
+            if module in self.scan_functions:
+                try:
+                    res = self.scan_functions[module]()
+                    self.results.append(f"{module.capitalize()} Scan: {res}")
+                except Exception as e:
+                    logging.error(f"Error running {module} scan: {e}")
+                    self.results.append(f"{module.capitalize()} Scan: Error")  # Indicate error
+
+    def get_results(self):
+        """Returns the results of the scans."""
+        return self.results
 
 def main():
     setup_logging()
@@ -118,12 +128,12 @@ def main():
 
         logging.info(f"Network Security Tester started on {platform.system()}")
         
-        # Pass port range to the scanning function
-        if args.ports:
-            port_range = args.ports if isinstance(args.ports, str) else "1-65535"
-            run_full_scan(selected_modules=selected_modules, port_range=port_range)
-        else:
-            run_full_scan(selected_modules=selected_modules)
+        # Initialize and run the scanner
+        scanner = Scanner(port_range=args.ports if args.ports else "1-65535")
+        scanner.run_scan(selected_modules)
+
+        for result in scanner.get_results():
+            logging.info(result)
         
         logging.info("Network Security Tester scan complete.")
 
