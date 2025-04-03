@@ -3,6 +3,8 @@ import logging
 import subprocess
 import shutil
 import queue  # Import the queue module
+import texttable  # Import the texttable library
+import re  # Import the regular expression module
 
 def check_command_exists(cmd):
     """Check if a command is available on the system."""
@@ -52,32 +54,29 @@ def scan_wifi(wifi_interface=None, output_queue=None):
             for line in output.splitlines():
                 if "SSID" in line:
                     ssid = line.split(":")[1].strip()
-                    networks.append({"ssid": ssid})
-                    if output_queue:
-                        output_queue.put(f"  SSID: {ssid}")
+                    security = "Unknown"  # Windows doesn't directly provide security type
+                    bssid = None
+                    match = re.search(r"BSSID\s*:\s*([0-9a-fA-F:]+)", line)
+                    if match:
+                        bssid = match.group(1).upper()
+                    networks.append({"ssid": ssid, "security": security, "signal": "N/A", "bssid": bssid})
         elif current_os == "Linux":
             if wifi_interface:
-                output = run_command_safe(["nmcli", "-f", "SSID,SECURITY,SIGNAL", "dev", "wifi", "ifname", wifi_interface])
+                output = run_command_safe(["nmcli", "-f", "SSID,SECURITY,SIGNAL,BSSID", "dev", "wifi", "ifname", wifi_interface])
             else:
-                output = run_command_safe(["nmcli", "-f", "SSID,SECURITY,SIGNAL", "dev", "wifi"])
+                output = run_command_safe(["nmcli", "-f", "SSID,SECURITY,SIGNAL,BSSID", "dev", "wifi"])
             lines = output.split("\n")[1:]
             for line in lines:
                 parts = line.split()
-                if len(parts) >= 3:
-                    network = {"ssid": parts[0], "security": parts[1], "signal": parts[2]}
-                    networks.append(network)
-                    if output_queue:
-                        output_queue.put(f"  SSID: {network['ssid']} | Security: {network['security']} | Signal: {network['signal']}")
+                if len(parts) >= 4:
+                    networks.append({"ssid": parts[0], "security": parts[1], "signal": parts[2], "bssid": parts[3].upper()})
         elif current_os == "Darwin":
             output = run_command_safe(["/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport", "-s"])
             lines = output.split("\n")[1:]
             for line in lines:
                 parts = line.split()
                 if len(parts) >= 3:
-                    network = {"ssid": parts[0], "security": parts[1], "signal": parts[2]}
-                    networks.append(network)
-                    if output_queue:
-                        output_queue.put(f"  SSID: {network['ssid']} | Security: {network['security']} | Signal: {network['signal']}")
+                    networks.append({"ssid": parts[0], "security": parts[1], "signal": parts[2], "bssid": None})  # BSSID not directly available
         else:
             logging.warning(f"Wi-Fi scanning is not supported on this OS ({current_os}).")
             if output_queue:
@@ -91,5 +90,9 @@ def scan_wifi(wifi_interface=None, output_queue=None):
 
     result = f"{len(networks)} networks found" if networks else "No Wi-Fi networks detected"
     if output_queue:
-        output_queue.put(result)
+        table = texttable.Texttable()
+        table.header(["SSID", "Security", "Signal", "BSSID"])
+        for network in networks:
+            table.add_row([network["ssid"], network["security"], network["signal"], network["bssid"] or "N/A"]) # Ensure no None values are passed
+        output_queue.put("Wi-Fi Networks:\n" + table.draw())
     return result

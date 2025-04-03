@@ -43,7 +43,7 @@ class Scanner:
     Manages the execution of network security scans.
     """
 
-    def __init__(self, port_range="1-65535", output_queue=None):  # Add output_queue
+    def __init__(self, port_range="1-65535", output_queue=None, stop_flag=False):  # Add stop_flag
         self.port_range = port_range
         self.scan_functions = {
             "wifi": scan_wifi,
@@ -53,9 +53,10 @@ class Scanner:
             "ports": self._run_port_scan  # Use internal method for port scan
         }
         self.results = []
-        self.output_queue = output_queue  # Store the output queue
+        self.output_queue = output_queue
+        self.stop_flag = stop_flag  # Store the stop flag
 
-    def _run_port_scan(self, port_range="1-65535"):  # Add port_range parameter with default
+    def _run_port_scan(self, port_range="1-65535", output_queue=None, stop_flag=False):  # Add stop_flag parameter
         """Internal method to run port scan with the instance's port range."""
         try:
             start_port, end_port = map(int, port_range.split("-"))
@@ -65,8 +66,9 @@ class Scanner:
         res = run_port_scan(
             start_port=start_port,
             end_port=end_port,
-            output_queue=self.output_queue
-        )  # Pass queue
+            output_queue=output_queue,
+            stop_flag=stop_flag # Pass the stop flag
+        )
         return f"Port Scan ({start_port}-{end_port}): {res}"
 
     def run_scan(self, selected_modules=None, **scan_options):
@@ -84,16 +86,20 @@ class Scanner:
                     if module == "wifi":
                         res = self.scan_functions[module](
                             wifi_interface=scan_options.get("wifi_interface"),
-                            output_queue=self.output_queue
-                        )  # Pass queue
+                            output_queue=self.output_queue,
+                            stop_flag=self.stop_flag # Pass the stop flag
+                        )
                     elif module == "ports":
                         res = self.scan_functions[module](
                             port_range=scan_options.get("port_range"),
-                            output_queue=self.output_queue
-                        )  # Pass queue
-                        #print(f"DEBUG: port_range in run_scan: {scan_options.get('port_range')}")
+                            output_queue=self.output_queue,
+                            stop_flag=self.stop_flag # Pass the stop flag
+                        )
                     else:
-                        res = self.scan_functions[module](output_queue=self.output_queue)  # Pass queue
+                        res = self.scan_functions[module](
+                            output_queue=self.output_queue,
+                            stop_flag=self.stop_flag # Pass the stop flag
+                        )
                     self.results.append(f"{module.capitalize()} Scan: {res}")
                 except Exception as e:
                     logging.error(f"Error running {module} scan: {e}")

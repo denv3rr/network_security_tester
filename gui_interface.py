@@ -229,16 +229,22 @@ class NST_GUI:
 
         self.stop_requested = True
         print("⚠️ Scan stop requested by user.\n")
+        # Disable the stop button while the thread is stopping
+        # This prevents multiple stop requests
+        self.stop_button.config(state="disabled")
         if self.scan_thread and self.scan_thread.is_alive():
             self.root.after(100, self.check_scan_thread)  # Check thread status after 100ms
+        else:
+            self.stop_button.config(state="normal") # Re-enable the stop button
 
     def check_scan_thread(self):
         """Checks if the scan thread has finished and handles cleanup."""
-        if self.scan_thread.is_alive():
+        if self.scan_thread and self.scan_thread.is_alive():
             self.root.after(100, self.check_scan_thread)  # Check again later
         else:
             self.scan_thread = None  # Clear the thread
             self.update_progress(0)  # Reset progress bar
+            self.stop_button.config(state="normal") # Re-enable the stop button
 
     def clear_output(self):
         """Clears all output from the GUI text box."""
@@ -271,9 +277,10 @@ class NST_GUI:
 
         # Instantiate Scanner if it doesn't exist
         if not hasattr(self, "scanner") or self.scanner is None:
-            self.scanner = Scanner(output_queue=self.output_queue)  # Pass the queue to the Scanner
+            self.scanner = Scanner(output_queue=self.output_queue, stop_flag=self.stop_requested)  # Pass the queue and stop flag to the Scanner
         else:
             self.scanner.output_queue = self.output_queue  # Update the scanner's queue
+            self.scanner.stop_flag = self.stop_requested
 
         self.scanner.run_scan(selected_modules, **scan_options)  # Call the Scanner's run_scan method
 
@@ -335,7 +342,11 @@ class NST_GUI:
         self.scan_thread.start()
         self.root.after(100, self.update_output)  # Start checking the queue
 
-if __name__ == "__main__":
-    root = tb.Window(themename="superhero")  # Use a modern theme
-    app = NST_GUI(root)
-    root.mainloop()
+    def start_scan_all(self):
+        """Starts a scan for all modules."""
+        self.stop_requested = False
+        selected_modules_list = self.get_selected_modules()
+        print("[DEBUG] Running all selected scans")
+        self.scan_thread = threading.Thread(target=self.run_scan_thread, args=(selected_modules_list,), daemon=True)
+        self.scan_thread.start()
+        self.root.after(100, self.update_output)
