@@ -10,11 +10,15 @@ def get_public_ip():
     """Retrieves the public IP address of the device."""
     try:
         response = requests.get("https://api64.ipify.org?format=json", timeout=5)
+        response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
         ip_data = response.json()
         return ip_data.get("ip", "Unknown")
-    except requests.RequestException as e:
+    except requests.exceptions.RequestException as e:
         logging.error(f"Error retrieving public IP: {e}")
         return "Error retrieving IP"
+    except json.JSONDecodeError as e:
+        logging.error(f"Error decoding JSON response: {e}")
+        return "Error decoding IP"
 
 def get_local_network_info():
     """Retrieves local network details including IP, MAC addresses, and default gateway."""
@@ -57,6 +61,9 @@ def get_bssid_list():
         else:
             logging.warning(f"BSSID scanning is not supported on this OS ({current_os}).")
             return []
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Error running BSSID scan command: {e}")
+        return []
     except Exception as e:
         logging.error(f"Error retrieving BSSID list: {e}")
         return []
@@ -64,22 +71,25 @@ def get_bssid_list():
     return bssid_list
 
 def get_bssid_geolocation(bssid):
-    """Retrieves geolocation data for a given BSSID using an API like Wigle.net (requires API key)."""
+    """Retrieves geolocation data for a given BSSID using an API like Wigle.net."""
     api_url = f"https://api.wigle.net/api/v2/network/detail?netid={bssid}"
     headers = {"User-Agent": "NetworkSecurityTester"}
     
     try:
         response = requests.get(api_url, headers=headers, timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            lat = data.get("location", {}).get("latitude", "Unknown")
-            lon = data.get("location", {}).get("longitude", "Unknown")
-            return {"Latitude": lat, "Longitude": lon}
-        else:
-            logging.warning(f"Failed to retrieve BSSID location: {response.status_code}")
-            return {"Latitude": "N/A", "Longitude": "N/A"}
-    except requests.RequestException as e:
+        response.raise_for_status()  # Raise HTTPError for bad responses
+        data = response.json()
+        lat = data.get("location", {}).get("latitude", "Unknown")
+        lon = data.get("location", {}).get("longitude", "Unknown")
+        return {"Latitude": lat, "Longitude": lon}
+    except requests.exceptions.RequestException as e:
         logging.error(f"Error retrieving BSSID location: {e}")
+        return {"Latitude": "Error", "Longitude": "Error"}
+    except json.JSONDecodeError as e:
+        logging.error(f"Error decoding JSON response: {e}")
+        return {"Latitude": "Error", "Longitude": "Error"}
+    except Exception as e:
+        logging.error(f"Unexpected error retrieving BSSID location: {e}")
         return {"Latitude": "Error", "Longitude": "Error"}
 
 def get_ip_geolocation(ip=None):
@@ -89,9 +99,13 @@ def get_ip_geolocation(ip=None):
     
     try:
         response = requests.get(f"https://ipinfo.io/{ip}/json", timeout=5)
+        response.raise_for_status()
         return response.json()
-    except requests.RequestException as e:
+    except requests.exceptions.RequestException as e:
         logging.error(f"Error retrieving IP geolocation: {e}")
+        return {"error": "Could not retrieve location"}
+    except json.JSONDecodeError as e:
+        logging.error(f"Error decoding JSON response: {e}")
         return {"error": "Could not retrieve location"}
 
 def run_network_metadata_scan():
