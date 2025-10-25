@@ -1,219 +1,246 @@
+# port_scanner.py
+# Concurrent TCP connect scanner with Unicode block progress + ETA,
+# tunable timeout/workers, optional banner grabbing, optional target hosts.
+
 import socket
 import logging
-import subprocess
 import platform
-import json
-import shutil
-import queue  # Import the queue module
-import texttable  # Import the texttable library
+import subprocess
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# Load known device/service signatures from a local JSON file
-DEVICE_SIGNATURES_FILE = "known_devices.json"
+try:
+    from texttable import Texttable
+except Exception:
+    Texttable = None
 
-def check_command_exists(cmd):
-    """Check if a command is available on the system."""
-    return shutil.which(cmd) is not None
+# ---------- Discovery ----------
 
-def run_command(cmd_list, check=True):
-    """
-    Executes a system command and returns the output.
-    Raises subprocess.CalledProcessError if the command fails (when check=True).
-    """
+def _run_safe(cmd):
     try:
-        result = subprocess.run(cmd_list, capture_output=True, text=True, check=check)
-        return result.stdout.strip()
-    except subprocess.CalledProcessError as e:
-        logging.error(f"Command '{' '.join(cmd_list)}' failed: {e}")
-        raise  # Re-raise the exception to be handled by the caller
+        res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        return res.stdout
     except Exception as e:
-        logging.error(f"Error running command '{' '.join(cmd_list)}': {e}")
-        raise
+        logging.debug(f"cmd fail {' '.join(cmd)}: {e}")
+        return ""
 
-def run_command_safe(cmd_list):
+def _is_junk_ip(ip: str) -> bool:
+    """Skip multicast/broadcast/loopback/APIPA noise."""
+    if ip.startswith("127.") or ip == "0.0.0.0": return True
+    if ip.startswith("169.254."): return True
+    if ip.startswith("224.") or ip.startswith("239."): return True
+    if ip.endswith(".255"): return True
+    if ":" in ip and ip.lower().startswith("ff"): return True
+    return False
+
+def get_network_devices(output_queue=None, stop_flag=None):
     """
-    Executes a system command and returns the output, or an error message if it fails.
-    Does not raise exceptions.
+    Heuristic LAN peer discovery via ARP/neighbor tables.
+    Good enough for quick triage; not exhaustive.
     """
-    try:
-        return run_command(cmd_list, check=True)
-    except subprocess.CalledProcessError as e:
-        return str(e)  # Return the error message
-    except Exception as e:
-        return str(e)
+    devices = {"IPv4": set(), "IPv6": set()}
+    osname = platform.system()
+    text = ""
+    if osname == "Windows":
+        text = _run_safe(["arp", "-a"])
+        for line in text.splitlines():
+            parts = line.split()
+            if parts:
+                ip = parts[0]
+                if ip.count(".") == 3 and not _is_junk_ip(ip):
+                    devices["IPv4"].add(ip)
+    else:
+        text = _run_safe(["ip", "neigh"])
+        for line in text.splitlines():
+            parts = line.split()
+            if parts:
+                ip = parts[0]
+                if ip.count(".") == 3 and not _is_junk_ip(ip):
+                    devices["IPv4"].add(ip)
+                elif ":" in ip and not _is_junk_ip(ip):
+                    devices["IPv6"].add(ip)
 
-def get_network_devices(output_queue=None, stop_flag=False):
-    """Retrieves active network devices on the local network (both IPv4 and IPv6)."""
-
-    devices = {"IPv4": [], "IPv6": []}
-    try:
-        current_os = platform.system()
-        if current_os == "Windows":
-            output = run_command_safe(["arp", "-a"])
-            for line in output.split("\n"):
-                if stop_flag:
-                    return {"IPv4": [], "IPv6": []}
-                parts = line.split()
-                if len(parts) >= 2:
-                    ip = parts[0]
-                    if ip.count(".") == 3:
-                        devices["IPv4"].append(ip)
-                    elif ip.count(":") >= 2:
-                        devices["IPv6"].append(ip)
-                    if output_queue:
-                        output_queue.put(f"  Device found: {ip}")
-        else:  # Linux/macOS
-            output = run_command_safe(["ip", "neigh"])
-            for line in output.split("\n"):
-                if stop_flag:
-                    return {"IPv4": [], "IPv6": []}
-                parts = line.split()
-                if len(parts) >= 1:
-                    ip = parts[0]
-                    if ip.count(".") == 3:
-                        devices["IPv4"].append(ip)
-                    elif ip.count(":") >= 2:
-                        devices["IPv6"].append(ip)
-                    if output_queue:
-                        output_queue.put(f"  Device found: {ip}")
-    except Exception as e:
-        logging.error(f"Error retrieving network devices: {e}")
-        if output_queue:
-            output_queue.put("Error retrieving network devices")
-    return {"IPv4": list(set(devices["IPv4"])), "IPv6": list(set(devices["IPv6"]))}
-
-def get_service_banner(ip, port):
-    """Attempts to retrieve the banner of a service running on a port."""
-
-    try:
-        with socket.socket(socket.AF_INET6 if ":" in ip else socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.settimeout(1)
-            sock.connect((ip, port))
-            banner = sock.recv(1024).decode().strip()
-            return banner if banner else "Unknown Service"
-    except:
-        return "Unknown Service"
-
-def scan_ports(ip, start_port=1, end_port=65535, output_queue=None, progress_callback=None, total_ports=65535, stop_flag=False):
-    """Scans a given IP address for open ports (1-65535) and retrieves service banners. Supports both IPv4 and IPv6."""
-
-    open_ports = {}
-
-    for port in range(start_port, end_port + 1):
-        if stop_flag: # Check the stop flag
-            return {}
-        try:
-            # Use AF_INET6 for IPv6, AF_INET for IPv4
-            with socket.socket(socket.AF_INET6 if ":" in ip else socket.AF_INET, socket.SOCK_STREAM) as sock:
-                sock.settimeout(0.5)  # Reduce timeout for efficiency
-                result = sock.connect_ex((ip, port))  # Attempt to connect to port
-
-                if result == 0:  # Connection successful (port is open)
-                    service = get_service_banner(ip, port)
-                    open_ports[port] = service
-                    if output_queue:
-                        output_queue.put(f"  ✅ Open port: {port} on {ip} | Service: {service}")
-
-                if progress_callback:
-                    progress = int((port / total_ports) * 100)
-                    progress_callback(progress)
-
-        except Exception as e:
-            logging.error(f"Error scanning port {port} on {ip}: {e}")
-            if output_queue:
-                output_queue.put(f"  Error scanning port {port} on {ip}: {e}")
-
-    return open_ports  # Dictionary format {port_number: service_name}
-
-def identify_device_type(open_ports, output_queue=None, stop_flag=False):
-    """Matches open ports against known device types."""
-
-    try:
-        with open(DEVICE_SIGNATURES_FILE, "r") as file:
-            known_devices = json.load(file)
-    except FileNotFoundError:
-        logging.warning("Device signatures file not found. Skipping device identification.")
-        if output_queue:
-            output_queue.put("Device signatures file not found. Skipping device identification.")
-        return {}
-
-    detected_devices = {}
-    for port, service in open_ports.items():
-        if stop_flag: # Check the stop flag
-            return {}
-        if str(port) in known_devices:
-            detected_devices[port] = known_devices[str(port)]
-            if output_queue:
-                output_queue.put(f"  Device type identified: {detected_devices[port]} (Port {port})")
-
-    return detected_devices
-
-def run_port_scan(start_port=1, end_port=65535, port_range="1-65535", output_queue=None, progress_callback=None, stop_flag=False):
-    """Scans all detected network devices for open ports and identifies possible device types. Supports both IPv4 and IPv6."""
-
-    logging.info("=== Running Full Port Scan on Network Devices ===")
     if output_queue:
-        output_queue.put("=== Running Full Port Scan on Network Devices ===")
-    devices = get_network_devices(output_queue, stop_flag)
-    if not devices["IPv4"] and not devices["IPv6"]:
-        logging.warning("No devices found on the network.")
-        if output_queue:
-            output_queue.put("No devices found on the network.")
+        for ip in sorted(devices["IPv4"]):
+            output_queue.put(f"  Device found: {ip}")
+        for ip in sorted(devices["IPv6"]):
+            output_queue.put(f"  Device found: {ip}")
+    return {"IPv4": sorted(devices["IPv4"]), "IPv6": sorted(devices["IPv6"])}
+
+# ---------- Ports & tuning ----------
+
+TOP_PORTS = [
+    # ~73 common ports
+    21,22,23,25,53,67,68,80,110,123,135,137,138,139,143,161,162,389,443,445,465,
+    514,587,631,993,995,1025,1433,1521,2049,2375,2376,2483,2484,3128,3306,3389,
+    3478,3690,4000,5000,5060,5432,5671,5672,5900,5985,5986,6379,6443,7001,7002,
+    7071,7199,8000,8008,8080,8081,8088,8140,8443,8888,9000,9042,9092,9200,9300,
+    9418,11211,15672,27017,27018,27019
+]
+
+# Defaults will be overridden by CLI when --fast is used
+DEFAULT_TIMEOUT = 0.30
+DEFAULT_WORKERS = 256
+
+# ---------- Helpers ----------
+
+def _scan_one(ip: str, port: int, timeout: float):
+    """Return port if open; else None. TCP connect (no raw sockets)."""
+    family = socket.AF_INET6 if ":" in ip else socket.AF_INET
+    with socket.socket(family, socket.SOCK_STREAM) as sock:
+        sock.settimeout(timeout)
+        try:
+            res = sock.connect_ex((ip, port))
+            return port if res == 0 else None
+        except Exception:
+            return None
+
+def _progress_bar(done: int, total: int, start_time: float) -> str:
+    """Unicode block progress bar (works fine on modern Windows terminals)."""
+    total = max(total, 1)
+    pct = done / total
+    width = 26
+    filled = int(pct * width)
+    bar = "█" * filled + "░" * (width - filled)
+    elapsed = max(time.time() - start_time, 0.001)
+    rate = done / elapsed
+    remaining = (total - done) / rate if rate > 0 else 0
+    return f"[{bar}] {pct:6.1%} | {done}/{total} | ETA {remaining:5.1f}s"
+
+def _banner(ip: str, port: int, timeout: float = 0.45) -> str:
+    """Best-effort banner (optional; keep short to stay fast)."""
+    try:
+        fam = socket.AF_INET6 if ":" in ip else socket.AF_INET
+        with socket.socket(fam, socket.SOCK_STREAM) as s:
+            s.settimeout(timeout)
+            s.connect((ip, port))
+            try:
+                data = s.recv(256)
+                if data:
+                    return data.decode(errors="replace").strip()
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return "Unknown"
+
+# ---------- Public API ----------
+
+def scan_ports(ip: str,
+               start_port: int,
+               end_port: int,
+               *,
+               output_queue=None,
+               stop_flag=None,
+               scan_type: str = "top",
+               no_banner: bool = True,
+               timeout: float = DEFAULT_TIMEOUT,
+               workers: int = DEFAULT_WORKERS):
+    """
+    Concurrent TCP port scan for one host.
+    Returns dict: {ip, open_ports{port:banner|True}, duration}.
+    """
+    if stop_flag and getattr(stop_flag, "is_set", lambda: False)():
+        return {"ip": ip, "open_ports": {}, "duration": 0.0}
+
+    if scan_type == "top":
+        port_list = TOP_PORTS
+    else:
+        port_list = list(range(start_port, end_port + 1))
+
+    total = len(port_list)
+    open_ports = {}
+    start_time = time.time()
+    workers = max(4, workers)
+    timeout = max(0.05, timeout)
+
+    # live progress
+    last_line = ""
+    def _print_progress(done):
+        nonlocal last_line
+        msg = _progress_bar(done, total, start_time)
+        if msg != last_line:
+            print("\r" + msg, end="", flush=True)
+            last_line = msg
+
+    done = 0
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        futs = {ex.submit(_scan_one, ip, p, timeout): p for p in port_list}
+        for fut in as_completed(futs):
+            if stop_flag and getattr(stop_flag, "is_set", lambda: False)():
+                break
+            port = futs[fut]
+            try:
+                res = fut.result()
+                if res:
+                    open_ports[res] = True if no_banner else _banner(ip, res, 0.45)
+                    if output_queue:
+                        output_queue.put(f"  [OPEN] {ip}:{res}")
+            except Exception:
+                pass
+            done += 1
+            _print_progress(done)
+
+    print()  # finish progress line
+    duration = time.time() - start_time
+    return {"ip": ip, "open_ports": open_ports, "duration": duration}
+
+def run_port_scan(start_port: int = 1,
+                  end_port: int = 1024,
+                  *,
+                  scan_type: str = "top",
+                  target_hosts=None,
+                  no_banner: bool = True,
+                  timeout: float = DEFAULT_TIMEOUT,
+                  workers: int = DEFAULT_WORKERS,
+                  output_queue=None,
+                  stop_flag=None):
+    """
+    Scans target hosts (if given) or discovered LAN devices.
+    - scan_type: 'top' (fast) by default
+    - no_banner: True to skip banner grabs (faster)
+    - timeout/workers: tune performance
+    """
+    title = f"=== Port Scan ({scan_type}) {start_port}-{end_port if scan_type!='top' else '*TOP*'} ==="
+    logging.info(title)
+    if output_queue: output_queue.put(title)
+
+    if target_hosts:
+        hosts = [h for h in target_hosts if h and not _is_junk_ip(h)]
+    else:
+        devices = get_network_devices(output_queue, stop_flag)
+        hosts = devices["IPv4"] or []
+
+    if not hosts:
+        msg = "No IPv4 hosts provided/discovered."
+        logging.warning(msg)
+        if output_queue: output_queue.put(msg)
         return "No devices found"
 
-    # Override start/end ports if a custom range is provided
-    try:
-        start_port, end_port = map(int, port_range.split("-"))
-    except ValueError:
-        logging.warning(f"Invalid port range '{port_range}'. Using default 1-65535.")
-        if output_queue:
-            output_queue.put(f"Invalid port range '{port_range}'. Using default 1-65535.")
-        start_port, end_port = 1, 65535
-
     results = {}
-    total_ports = end_port - start_port + 1
-    for ip_type, ip_list in devices.items():
-        for device in ip_list:
-            if stop_flag: # Check the stop flag
-                return {}
-            logging.info(f"Scanning {ip_type} device {device} for ports {start_port}-{end_port}...")
-            if output_queue:
-                output_queue.put(f"Scanning {ip_type} device {device} for ports {start_port}-{end_port}...")
-            open_ports = scan_ports(device, start_port, end_port, output_queue, progress_callback, total_ports, stop_flag)  # Scanning selected range
-            detected_devices = identify_device_type(open_ports, output_queue, stop_flag)
+    for ip in hosts:
+        if stop_flag and getattr(stop_flag, "is_set", lambda: False)():
+            break
+        logging.info(f"Scanning {ip}...")
+        if output_queue: output_queue.put(f"Scanning {ip}...")
+        res = scan_ports(
+            ip, start_port, end_port,
+            output_queue=output_queue,
+            stop_flag=stop_flag,
+            scan_type=scan_type,
+            no_banner=no_banner,
+            timeout=timeout,
+            workers=workers
+        )
+        results[ip] = res
 
-            if open_ports:
-                logging.warning(f"Device {device} has open ports: {open_ports}")
-                if output_queue:
-                    output_queue.put(f"Device {device} has open ports: {open_ports}")
-                if detected_devices:
-                    logging.info(f"Identified device types for {device}: {detected_devices}")
-                    if output_queue:
-                        output_queue.put(f"Identified device types for {device}: {detected_devices}")
-            else:
-                logging.info(f"Device {device} has no open ports detected.")
-                if output_queue:
-                    output_queue.put(f"Device {device} has no open ports detected.")
-
-            results[device] = {"open_ports": open_ports, "identified_devices": detected_devices}
-
-    if output_queue:
-        table = texttable.Texttable()
-        table.header(["Port", "Service", "Device Type"])
-        for device, data in results.items():
-            if stop_flag: # Check the stop flag
-                return {}
-            output_queue.put(f"\n--- Scan results for {device} ---")
-            if data["open_ports"]:
-                for port, service in data["open_ports"].items():
-                    device_type = data["identified_devices"].get(port, "Unknown")
-                    table.add_row([port, service, device_type])
-                output_queue.put(table.draw())
-                table.reset()  # Clear table for next device
-            else:
-                output_queue.put("No open ports found.")
+    # summary table
+    if Texttable and results:
+        t = Texttable()
+        t.header(["Host", "Open Ports", "Duration (s)"])
+        for ip, r in results.items():
+            ports = ",".join(map(str, sorted(r["open_ports"].keys())))
+            t.add_row([ip, ports or "None", f"{r['duration']:.1f}"])
+        print(t.draw())
 
     return results
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-    run_port_scan()
