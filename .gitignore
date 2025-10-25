@@ -1,16 +1,65 @@
-# IGNORE
+# ============================
+# Python / NST Project Gitignore
+# ============================
 
-# ------------------------------
-
-# FOLDERS
+# --- Python build & cache ---
 __pycache__/
-logs/
-
-# ENV RELATED
 *.py[cod]
+*$py.class
 *.pyo
-.env
 
-# TXT and LOGS
+# --- Virtual environments ---
+.env/
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# --- IDE & Editor files ---
+.vscode/
+.idea/
+*.code-workspace
+
+# --- System files ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Logs ---
+# Keep folder, ignore contents
+logs/*
+!logs/.gitkeep
+
+# --- Output & data ---
 *.log
-*.txt
+*.tmp
+*.bak
+*.old
+*.swp
+
+# --- Python packaging ---
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# --- Reports / Results ---
+results.json
+*.csv
+*.xlsx
+*.json
+
+# --- OS specific ---
+*.lnk
+
+# --- Others ---
+# Exclude any temporary testing files or archives
+*.zip
+*.tar
+*.gz
+
+# --- Local scripts ---
+run.sh
+run.bat
