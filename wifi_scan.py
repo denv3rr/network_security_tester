@@ -1,27 +1,51 @@
 # wifi_scan.py
-# Lists nearby Wi-Fi networks with SSID/BSSID/Channel/Signal on
-# Windows (netsh), Linux (nmcli/iwlist), macOS (airport).
-# Optional geolocation via Mozilla or Google if env key provided and --geo flag set.
+# Windows: detect location permission + admin/elevation requirement and show clear guidance.
+# Also supports a diagnostic mode to dump raw netsh outputs via the runner.
 
 import os
 import re
 import subprocess
 import logging
-import json
 import platform
+import requests
+from typing import List, Dict, Any, Optional
 
-import requests  # present in requirements
-
-def _run(cmd):
+def _run(cmd: list[str]) -> str:
     try:
         out = subprocess.run(cmd, capture_output=True, text=True, check=True)
         return out.stdout
     except Exception as e:
         logging.debug(f"wifi cmd fail {' '.join(cmd)}: {e}")
-        return ""
+        try:
+            # still return stderr so we can parse error strings
+            return e.stderr if hasattr(e, "stderr") and e.stderr else ""
+        except Exception:
+            return ""
 
-def parse_windows_netsh(text: str):
-    """Parse `netsh wlan show networks mode=Bssid`."""
+def _svc_running_windows(name: str) -> Optional[bool]:
+    out = _run(["sc", "query", name])
+    if not out:
+        return None
+    if "RUNNING" in out: return True
+    if "STOPPED" in out: return False
+    return None
+
+def _is_admin_windows() -> Optional[bool]:
+    try:
+        import ctypes
+        return bool(ctypes.windll.shell32.IsUserAnAdmin())
+    except Exception:
+        return None
+
+def parse_windows_interfaces(text: str) -> list[str]:
+    names = []
+    for line in text.splitlines():
+        m = re.match(r"^\s*Name\s*:\s*(.+)$", line, flags=re.I)
+        if m:
+            names.append(m.group(1).strip())
+    return names
+
+def parse_windows_netsh_networks(text: str) -> list[dict]:
     networks = []
     current = {}
     ssid_re = re.compile(r"^\s*SSID\s+\d+\s*:\s*(.*)$", re.I)
@@ -39,171 +63,264 @@ def parse_windows_netsh(text: str):
             continue
         m = bssid_re.match(line)
         if m:
-            current.setdefault("bssids", []).append(m.group(1).lower())
-            continue
+            current.setdefault("bssids", []).append(m.group(1).lower()); continue
         m = sig_re.match(line)
         if m:
-            current["signal"] = int(m.group(1))
-            continue
+            current["signal"] = int(m.group(1)); continue
         m = chan_re.match(line)
         if m:
-            current["channel"] = int(m.group(1))
-            continue
+            current["channel"] = int(m.group(1)); continue
         m = auth_re.match(line)
         if m:
-            current["auth"] = m.group(1).strip()
-            continue
+            current["auth"] = m.group(1).strip(); continue
     if current:
         networks.append(current)
     return networks
 
-def parse_nmcli(text: str):
-    """Parse `nmcli -t -f SSID,BSSID,CHAN,SIGNAL,SECURITY dev wifi list`."""
-    networks = []
+def parse_nmcli(text: str) -> list[dict]:
+    nets = []
     for line in text.splitlines():
-        # SSID:BSSID:CHAN:SIGNAL:SEC
         parts = line.split(":")
-        if len(parts) < 5:
-            continue
+        if len(parts) < 5: continue
         ssid, bssid, chan, sig, sec = parts[:5]
         n = {"ssid": ssid or "<hidden>", "bssids": [bssid.lower()] if bssid else [],
              "channel": int(chan) if chan.isdigit() else None,
              "signal": int(sig) if sig.isdigit() else None,
              "auth": sec}
-        networks.append(n)
-    return _merge_by_ssid(networks)
+        nets.append(n)
+    return _merge_by_ssid(nets)
 
-def parse_airport(text: str):
-    """Parse `/System/Library/.../airport -s` output on macOS."""
-    networks = []
+def parse_airport(text: str) -> list[dict]:
+    nets = []
     header = True
     for line in text.splitlines():
-        if header:
-            header = False
-            continue
-        # SSID BSSID RSSI CHANNEL HT CC SECURITY
-        if not line.strip():
-            continue
+        if header: header = False; continue
+        if not line.strip(): continue
         try:
             parts = re.split(r"\s{2,}", line.strip())
             ssid, bssid, rssi, chan = parts[0], parts[1].lower(), parts[2], parts[3]
-            sig = min(max(2*(int(rssi)+100), 0), 100) if rssi.lstrip("-").isdigit() else None
+            sig = 2*(int(rssi)+100) if rssi.lstrip("-").isdigit() else None
+            sig = max(0, min(100, sig)) if sig is not None else None
             ch = int(chan.split(",")[0]) if chan.split(",")[0].isdigit() else None
-            networks.append({"ssid": ssid or "<hidden>", "bssids": [bssid], "signal": sig, "channel": ch})
+            nets.append({"ssid": ssid or "<hidden>", "bssids": [bssid], "signal": sig, "channel": ch})
         except Exception:
             continue
-    return _merge_by_ssid(networks)
+    return _merge_by_ssid(nets)
 
-def _merge_by_ssid(items):
-    """Merge entries with same SSID (collect BSSIDs)."""
-    by_ssid = {}
+def _merge_by_ssid(items: list[dict]) -> list[dict]:
+    by = {}
     for n in items:
         key = n.get("ssid") or "<hidden>"
-        if key not in by_ssid:
-            by_ssid[key] = {**n}
-            by_ssid[key]["bssids"] = list(n.get("bssids") or [])
+        if key not in by:
+            by[key] = {**n}
+            by[key]["bssids"] = list(n.get("bssids") or [])
         else:
-            by_ssid[key]["bssids"].extend(n.get("bssids") or [])
-            by_ssid[key]["bssids"] = sorted(list(set(by_ssid[key]["bssids"])))
-        # keep best signal/channel if present
+            by[key]["bssids"].extend(n.get("bssids") or [])
+            by[key]["bssids"] = sorted(list(set(by[key]["bssids"])))
         if n.get("signal") is not None:
-            by_ssid[key]["signal"] = max(by_ssid[key].get("signal") or 0, n["signal"])
-        if n.get("channel") and not by_ssid[key].get("channel"):
-            by_ssid[key]["channel"] = n["channel"]
-    return [by_ssid[k] for k in sorted(by_ssid)]
+            by[key]["signal"] = max(by[key].get("signal") or 0, n["signal"])
+        if n.get("channel") and not by[key].get("channel"):
+            by[key]["channel"] = n["channel"]
+    return [by[k] for k in sorted(by)]
 
-# ---------- Optional Geolocation ----------
+# ---- Geolocation (kept from previous version) ----
 
-def geolocate_bssids(bssids, output_queue=None):
-    """
-    Use Mozilla Location Service (MLS) or Google Geolocation API if API key env var is set.
-    Env:
-      MLS_API_KEY           (preferred; free for dev)
-      GOOGLE_GEO_API_KEY    (fallback)
-    """
+def _post_json(url, payload, timeout=5):
     try:
-        if not bssids:
-            return None
-        if os.getenv("MLS_API_KEY"):
-            url = f"https://location.services.mozilla.com/v1/geolocate?key={os.getenv('MLS_API_KEY')}"
-            payload = {"wifiAccessPoints": [{"macAddress": b} for b in bssids]}
-            r = requests.post(url, json=payload, timeout=5)
-            if r.ok:
-                return r.json()  # {location:{lat,lng}, accuracy:...}
-        elif os.getenv("GOOGLE_GEO_API_KEY"):
-            url = f"https://www.googleapis.com/geolocation/v1/geolocate?key={os.getenv('GOOGLE_GEO_API_KEY')}"
-            payload = {"wifiAccessPoints": [{"macAddress": b} for b in bssids]}
-            r = requests.post(url, json=payload, timeout=5)
-            if r.ok:
-                return r.json()
-        else:
-            if output_queue:
-                output_queue.put("No geolocation API key set (MLS_API_KEY or GOOGLE_GEO_API_KEY). Skipping geo.")
+        return requests.post(url, json=payload, timeout=timeout)
     except Exception as e:
-        logging.debug(f"geo error: {e}")
+        logging.debug(f"HTTP POST {url} failed: {e}")
+        return None
+
+def geolocate_bssids(bssids: list[str]) -> Optional[dict]:
+    if not bssids: return None
+    mls = os.getenv("MLS_API_KEY")
+    gkey = os.getenv("GOOGLE_GEO_API_KEY")
+    if mls:
+        url = f"https://location.services.mozilla.com/v1/geolocate?key={mls}"
+        r = _post_json(url, {"wifiAccessPoints": [{"macAddress": b} for b in bssids]})
+        if r and r.ok: return r.json()
+    if gkey:
+        url = f"https://www.googleapis.com/geolocation/v1/geolocate?key={gkey}"
+        r = _post_json(url, {"wifiAccessPoints": [{"macAddress": b} for b in bssids]})
+        if r and r.ok: return r.json()
     return None
 
-# ---------- Public API ----------
+def geolocate_ip_fallback() -> Optional[dict]:
+    try:
+        r = requests.get("http://ip-api.com/json/", timeout=4)
+        if r.ok:
+            j = r.json()
+            if j.get("lat") and j.get("lon"):
+                return {"location": {"lat": j["lat"], "lng": j["lon"]}, "accuracy": None}
+    except Exception:
+        pass
+    try:
+        r = requests.get("https://ipapi.co/json/", timeout=4)
+        if r.ok:
+            j = r.json()
+            if j.get("latitude") and j.get("longitude"):
+                return {"location": {"lat": j["latitude"], "lng": j["longitude"]}, "accuracy": None}
+    except Exception:
+        pass
+    return None
 
-def scan_wifi(wifi_interface=None, output_queue=None, stop_flag=None, do_geolocation=False, **_):
+# ---------------- public API ----------------
+
+def scan_wifi(wifi_interface: Optional[str] = None,
+              output_queue=None,
+              stop_flag=None,
+              do_geolocation: bool = False,
+              diag: bool = False,
+              **_ignore):
     """
-    Returns: { 'networks': [ {ssid, bssids[], signal(0-100), channel, auth? , location?} ] }
-    - Windows: netsh
-    - Linux: nmcli (preferred), fallback iwlist
-    - macOS: airport
+    Windows improvements:
+      - Detects if Location services are disabled and/or elevation is required.
+      - Enumerates interfaces; scans each (or the specified --wifi_interface).
+      - Returns explicit 'reason' when data can't be retrieved.
+
+    Returns dict:
+      {
+        'status': 'ok'|'ok_empty'|'no_adapter'|'unsupported',
+        'note': str?,
+        'reason': str?,
+        'interfaces': [..]?,
+        'networks': [...]
+      }
     """
     if stop_flag and getattr(stop_flag, "is_set", lambda: False)():
         return {"status": "stopped"}
 
     osname = platform.system()
-    networks = []
+    networks: list[dict] = []
+    result = {"status": "ok", "networks": networks}
 
     try:
         if osname == "Windows":
-            text = _run(["netsh", "wlan", "show", "networks", "mode=Bssid"])
-            networks = parse_windows_netsh(text)
+            # Check service and admin
+            lfsvc = _svc_running_windows("lfsvc")  # Geolocation Service
+            wlan  = _svc_running_windows("WlanSvc")
+            admin = _is_admin_windows()
+
+            int_text = _run(["netsh", "wlan", "show", "interfaces"])
+            names = parse_windows_interfaces(int_text)
+            if wifi_interface:
+                names = [wifi_interface]
+
+            if diag:
+                if output_queue: output_queue.put("--- Wi-Fi diag (Windows) ---")
+                for line in int_text.splitlines():
+                    if output_queue: output_queue.put("  " + line)
+
+            if not names:
+                msg = "No wireless interfaces detected."
+                result.update({"status": "no_adapter", "note": msg, "reason": "no_interface"})
+                if output_queue: output_queue.put(msg)
+                return result
+
+            # Attempt a scan per interface
+            all_errors = []
+            for name in names:
+                out = _run(["netsh", "wlan", "show", "networks", f"interface={name}", "mode=Bssid"])
+                lower = (out or "").lower()
+
+                if diag and output_queue:
+                    output_queue.put(f"--- netsh show networks for '{name}' ---")
+                    for line in (out or "").splitlines():
+                        output_queue.put("  " + line)
+
+                # Detect common permission cases
+                needs_location = ("location permission" in lower) or ("ms-settings:privacy-location" in lower)
+                needs_admin    = ("requires elevation" in lower) or ("access is denied" in lower)
+
+                if needs_location or needs_admin:
+                    reason = []
+                    if needs_location:
+                        reason.append("Location services disabled")
+                    if needs_admin or admin is False:
+                        reason.append("Not elevated (Run as Administrator)")
+                    all_errors.append(", ".join(reason))
+                    continue  # try next interface (but typically same outcome)
+
+                nets = parse_windows_netsh_networks(out)
+                networks.extend(nets)
+
+            if not networks:
+                # No networks visible due to perms or radio state
+                note_bits = []
+                if wlan is False:
+                    note_bits.append("WLAN AutoConfig service is STOPPED")
+                if lfsvc is False:
+                    note_bits.append("Geolocation service (lfsvc) is STOPPED")
+                if admin is False:
+                    note_bits.append("Not running elevated (Administrator)")
+                if not note_bits and all_errors:
+                    note_bits.append("; ".join(all_errors))
+                if not note_bits and "State                  : disconnected" in int_text:
+                    note_bits.append("Wi-Fi adapter is disconnected (networks may be hidden)")
+
+                reason = "; ".join(note_bits) if note_bits else "No scanable networks returned by netsh"
+                msg = f"Wi-Fi scan returned no data — {reason}."
+                result.update({"status": "ok_empty", "note": msg, "reason": reason, "interfaces": names})
+                if output_queue: output_queue.put(msg)
+                return result
 
         elif osname == "Linux":
             text = _run(["nmcli", "-t", "-f", "SSID,BSSID,CHAN,SIGNAL,SECURITY", "dev", "wifi", "list"])
-            if not text.strip():
-                # very old distros may only have iwlist
-                text = _run(["iwlist", wifi_interface or "wlan0", "scanning"])
-                # minimal iwlist parser (SSID/BSSID/CH) not shown for brevity—skipped here.
-                pass
-            networks = parse_nmcli(text)
+            if text.strip():
+                networks = parse_nmcli(text)
+            else:
+                msg = "nmcli returned no data (no adapter, rfkill, or permissions)."
+                result.update({"status": "no_adapter", "note": msg, "reason": "nmcli_empty"})
+                if output_queue: output_queue.put(msg)
+                return result
 
         elif osname == "Darwin":
             airport = "/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport"
             text = _run([airport, "-s"])
-            networks = parse_airport(text)
+            if text.strip():
+                networks = parse_airport(text)
+            else:
+                msg = "airport returned no data."
+                result.update({"status": "no_adapter", "note": msg, "reason": "airport_empty"})
+                if output_queue: output_queue.put(msg)
+                return result
 
         else:
-            if output_queue: output_queue.put(f"Wi-Fi scan not supported on {osname}.")
-            return {"status": "unsupported", "os": osname}
+            msg = f"Wi-Fi scan not supported on {osname}."
+            result.update({"status": "unsupported", "note": msg, "reason": "os_unsupported"})
+            if output_queue: output_queue.put(msg)
+            return result
 
-        # Optional geolocation (one call with all BSSIDs to keep it fast)
-        if do_geolocation and networks:
+        # Optional geolocation
+        if networks:
+            # accurate (BSSID DB) if keys present; else IP fallback
             all_bssids = sorted({b for n in networks for b in (n.get("bssids") or [])})
-            geo = geolocate_bssids(all_bssids, output_queue)
-            # attach the same coarse geo to each entry (most services return centroid)
+            geo = geolocate_bssids(all_bssids) or geolocate_ip_fallback()
             if geo and "location" in geo:
                 for n in networks:
-                    n["location"] = geo["location"]  # {'lat':..., 'lng':...}
+                    n["location"] = geo["location"]
                     n["accuracy_m"] = geo.get("accuracy")
 
-        # Console output
-        for n in networks:
-            ssid = n.get("ssid") or "<hidden>"
-            bssid_count = len(n.get("bssids") or [])
-            sig = n.get("signal")
-            ch = n.get("channel")
-            line = f"SSID='{ssid}'  BSSIDs={bssid_count}  Signal={sig if sig is not None else '?'}%  Ch={ch if ch else '?'}"
-            logging.info(line)
-            if output_queue: output_queue.put(line)
+            # print human lines
+            for n in networks:
+                ssid = n.get("ssid") or "<hidden>"
+                bssid_count = len(n.get("bssids") or [])
+                sig = n.get("signal"); ch = n.get("channel")
+                line = f"SSID='{ssid}'  BSSIDs={bssid_count}  Signal={sig if sig is not None else '?'}%  Ch={ch if ch else '?'}"
+                if n.get("location"):
+                    loc = n["location"]
+                    line += f"  Geo={loc.get('lat'):.5f},{loc.get('lng'):.5f}"
+                    if n.get("accuracy_m"):
+                        line += f" ±{int(n['accuracy_m']):d}m"
+                logging.info(line)
+                if output_queue: output_queue.put(line)
 
-        return {"status": "ok", "networks": networks}
+        result["networks"] = networks
+        result["status"] = "ok" if networks else "ok_empty"
+        return result
 
     except Exception as e:
         logging.error(f"wifi scan error: {e}")
         if output_queue: output_queue.put(f"wifi scan error: {e}")
-        return {"error": str(e)}
+        return {"status": "error", "error": str(e), "networks": []}
