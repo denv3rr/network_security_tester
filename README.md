@@ -11,9 +11,11 @@
   
 </div>
 
-Multi-platform Python tool for **network and host security assessment** and **geolocation via IP lookup**. No GUI.
+Multi-platform Python tool for **network and host security assessment** and **geolocation via IP lookup**. No GUI. Works on **Windows, Linux, and macOS**.
 
-### Features
+---
+
+## Features
 
 - **Wi-Fi scanning**
   - Lists visible networks, channels, BSSIDs, and optional BSSID/IP geolocation.
@@ -27,8 +29,6 @@ Multi-platform Python tool for **network and host security assessment** and **ge
   - Reports hostname, local IPs, interfaces, gateway, public IP, ISP, ASN, and geographic info.
 - **Full Scan mode**
   - Runs all modules in a single command.
-
-Works on **Windows, Linux, and macOS**.
 
 ---
 
