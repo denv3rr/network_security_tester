@@ -37,11 +37,20 @@ def run_command_safe(cmd_list):
     except Exception as e:
         return str(e)
 
-def scan_wifi(wifi_interface=None, output_queue=None):
+def scan_wifi(wifi_interface=None, interface=None, output_queue=None, stop_flag=None, **kwargs):
     """
     Scans for available Wi-Fi networks using OS-specific commands.
     Returns a summary string with network count and security statuses.
     """
+    """
+    interface: optional interface string
+    stop_flag: threading.Event or similar to cancel
+    **kwargs: tolerant for future options
+    """
+
+    if stop_flag and stop_flag.is_set():
+        return {"status": "stopped"}
+
     logging.info("Scanning for Wi-Fi networks...")
     if output_queue:
         output_queue.put("Scanning for Wi-Fi networks...")

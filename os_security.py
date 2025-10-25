@@ -37,11 +37,14 @@ def run_command_safe(cmd_list):
     except Exception as e:
         return str(e)
 
-def check_os_security(output_queue=None):
+def check_os_security(output_queue=None, stop_flag=None, **kwargs):
     """
     Cross-platform OS security check with rich output.
     Supports Windows, Debian/Ubuntu, Fedora/RedHat, Arch, macOS.
     """
+
+    if stop_flag and stop_flag.is_set():
+        return {"status": "stopped"}
 
     current_os = platform.system()
     issues = 0

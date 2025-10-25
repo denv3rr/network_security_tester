@@ -3,12 +3,12 @@ import requests
 import socket
 import logging
 import json
-import netifaces
+import ifaddr
 import subprocess
 import shutil
-import queue  # Import the queue module
-import re  # Import the regular expression module
-import texttable  # Import the texttable library
+import queue
+import re
+import texttable
 
 def check_command_exists(cmd):
     """Check if a command is available on the system."""
@@ -206,8 +206,11 @@ def get_ip_geolocation(ip=None, output_queue=None):
             output_queue.put(f"  Error decoding IP geolocation response for {ip}")
         return {"error": "Could not retrieve location"}
 
-def run_network_metadata_scan(output_queue=None):
+def run_network_metadata_scan(output_queue=None, stop_flag=None, **kwargs):
     """Runs a full network metadata scan and logs the results."""
+
+    if stop_flag and stop_flag.is_set():
+        return {"status": "stopped"}
 
     logging.info("=== Running Network Metadata Scan ===")
     if output_queue:

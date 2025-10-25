@@ -1,6 +1,6 @@
 import platform
 import logging
-import datetime
+from datetime import datetime
 import os
 import argparse
 from wifi_scan import scan_wifi
@@ -9,6 +9,14 @@ from os_security import check_os_security
 from network_scanner import run_network_metadata_scan
 from port_scanner import run_port_scan
 
+# Utility function to print section headers
+def print_section(title):
+    print()
+    print("="*60)
+    print(f"{title} — {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("="*60)
+
+# Logging setup
 def setup_logging():
     """
     Configures logging to output to console and a file, with auto-cleanup of old log files.
@@ -43,6 +51,7 @@ class Scanner:
     Manages the execution of network security scans.
     """
 
+    # Initialize with default port range and scan functions
     def __init__(self, port_range="1-65535", output_queue=None, stop_flag=False):  # Add stop_flag
         self.port_range = port_range
         self.scan_functions = {
@@ -72,33 +81,43 @@ class Scanner:
         return f"Port Scan ({start_port}-{end_port}): {res}"
 
     def run_scan(self, selected_modules=None, **scan_options):
+        # scan_options contains port_range, wifi_interface, scan_type, etc.
         """
         Executes the selected scans. If no modules are selected, runs all.
         Accepts scan_options for module-specific arguments.
         """
-        if not selected_modules:
-            selected_modules = self.scan_functions.keys()  # Run all if none selected
 
+        # Run all if none selected
+        if not selected_modules:
+            selected_modules = self.scan_functions.keys()
+
+        # Execute each selected scan
         for module in selected_modules:
             if module in self.scan_functions:
                 try:
                     # Pass relevant options to each scan function
                     if module == "wifi":
+                        # For Wi-Fi scan, pass wifi_interface
                         res = self.scan_functions[module](
                             wifi_interface=scan_options.get("wifi_interface"),
                             output_queue=self.output_queue,
                             stop_flag=self.stop_flag # Pass the stop flag
+                            **scan_options
                         )
                     elif module == "ports":
+                        # For port scan, pass port_range
                         res = self.scan_functions[module](
                             port_range=scan_options.get("port_range"),
                             output_queue=self.output_queue,
                             stop_flag=self.stop_flag # Pass the stop flag
+                            **scan_options
                         )
                     else:
+                        # For other modules
                         res = self.scan_functions[module](
                             output_queue=self.output_queue,
                             stop_flag=self.stop_flag # Pass the stop flag
+                            **scan_options
                         )
                     self.results.append(f"{module.capitalize()} Scan: {res}")
                 except Exception as e:
@@ -109,6 +128,7 @@ class Scanner:
         """Returns the results of the scans."""
         return self.results
 
+# Main CLI entry point
 def main():
     setup_logging()
     parser = argparse.ArgumentParser(description="Network Security Tester (NST) - A multi-platform tool for scanning Wi-Fi networks, Bluetooth devices, OS security settings, and network metadata, including BSSID geolocation and IP tracking. Supports both CLI and GUI modes.")
@@ -126,7 +146,6 @@ def main():
         help="Scan network devices for open ports (default: all ports). Provide a custom range (e.g., '--ports 1-1000').",
     )
     parser.add_argument("--all", action="store_true", help="Run full scan (all modules)")
-    parser.add_argument("--gui", action="store_true", help="Launch GUI mode")
     parser.add_argument("--silent", action="store_true", help="Run scan without logging output")
     parser.add_argument("--wifi_interface", help="Specify the Wi-Fi interface to use for scanning")  # CLI option for wifi_interface
 
@@ -135,28 +154,20 @@ def main():
     if args.silent:
         logging.disable(logging.CRITICAL)  # Turns off all logging
 
-    if args.gui:
-        from gui_interface import NST_GUI
-        import tkinter as tk
-
-        root = tk.Tk()
-        app = NST_GUI(root)
-        root.mainloop()
+    selected_modules = []
+    if args.all or not any([args.wifi, args.bluetooth, args.os, args.network, args.ports]):
+        selected_modules = None  # Run all modules
     else:
-        selected_modules = []
-        if args.all or not any([args.wifi, args.bluetooth, args.os, args.network, args.ports]):
-            selected_modules = None  # Run all modules
-        else:
-            if args.wifi:
-                selected_modules.append("wifi")
-            if args.bluetooth:
-                selected_modules.append("bluetooth")
-            if args.os:
-                selected_modules.append("os")
-            if args.network:
-                selected_modules.append("network")
-            if args.ports:
-                selected_modules.append("ports")
+        if args.wifi:
+            selected_modules.append("wifi")
+        if args.bluetooth:
+            selected_modules.append("bluetooth")
+        if args.os:
+            selected_modules.append("os")
+        if args.network:
+            selected_modules.append("network")
+        if args.ports:
+            selected_modules.append("ports")
 
         logging.info(f"Network Security Tester started on {platform.system()}")
 
@@ -165,7 +176,7 @@ def main():
         scan_options = {}
         if args.wifi_interface:
             scan_options["wifi_interface"] = args.wifi_interface
-        scanner.run_scan(selected_modules, scan_options=scan_options)
+        scanner.run_scan(selected_modules, **scan_options)
 
         for result in scanner.get_results():
             logging.info(result)
