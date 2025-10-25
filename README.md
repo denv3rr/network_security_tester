@@ -120,10 +120,11 @@ cd network_security_tester
 
 ---
 
-<img src="https://user-images.githubusercontent.com/74038190/212284100-561aa473-3905-4a80-b561-0d28506553ee.gif">
+[COMMENT]: <LOGO*****************************************>
 <div align="center">
   <a href="https://seperet.com">
-    <img src="https://github.com/denv3rr/denv3rr/blob/main/Seperet_Slam_White.gif"/>
+    <img src=https://github.com/denv3rr/denv3rr/blob/main/IMG_4225.gif/>    
   </a>
 </div>
-<img src="https://user-images.githubusercontent.com/74038190/212284100-561aa473-3905-4a80-b561-0d28506553ee.gif">
+<br></br>
+
