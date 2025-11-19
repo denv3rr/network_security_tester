@@ -308,7 +308,7 @@ def choose_port_scan_type(default_code="top") -> str:
     print("Choose port scan type:\n")
     
     for k, (code, desc) in opts.items():
-        print(f"  {k}) {code:7s} — {desc}")
+        print(f"  {C.OK}{k}{C.RESET}) {code:7s} — {desc}")
     sel = (input(f"\n  {C.OK}[Enter]{C.RESET}    — default top-ports scan.\n\nSelection: ").strip() or "").lower()
     if sel in opts:
         return opts[sel][0]
