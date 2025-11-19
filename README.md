@@ -1,19 +1,55 @@
 <div align="center">
 
-  ![GitHub repo size](https://img.shields.io/github/repo-size/denv3rr/network_security_tester)
-  ![GitHub Created At](https://img.shields.io/github/created-at/denv3rr/network_security_tester)
-  ![Last Commit](https://img.shields.io/github/last-commit/denv3rr/network_security_tester)
-  ![Issues](https://img.shields.io/github/issues/denv3rr/network_security_tester)
-  ![License](https://img.shields.io/github/license/denv3rr/network_security_tester)
+# Network Explorer
+
+</div>
+
+<div align="center">
+
+  [![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=fff)](#)
+  ![GitHub repo size](https://img.shields.io/github/repo-size/denv3rr/network-explorer)
+  ![GitHub Created At](https://img.shields.io/github/created-at/denv3rr/network-explorer)
+  ![Last Commit](https://img.shields.io/github/last-commit/denv3rr/network-explorer)
+  ![Issues](https://img.shields.io/github/issues/denv3rr/network-explorer)
+  ![License](https://img.shields.io/github/license/denv3rr/network-explorer)
   ![Website](https://img.shields.io/website?url=https%3A%2F%2Fseperet.com&label=seperet.com)
+  <div align="center">
+
+
+  <!-- OS Icons -->
+  <img width="32" alt="image" src="https://github.com/user-attachments/assets/3b32cddc-c6c6-4acc-b2de-d01b30e5613d" />
+  <img width="32" alt="image" src="https://github.com/user-attachments/assets/af8dec60-cab6-4c1a-8ea3-9cb2d75e8516" />
+  <img width="32" alt="image" src="https://github.com/user-attachments/assets/df923ccd-dd6a-4b86-9864-2c5d6cea4e4a" />
+
+</div>
+  
+</div>
+
+<br><br>
+
+<div align="center">
+
+<div align="center">
+  <a href="https://seperet.com">
+    <img width="100" src=https://github.com/denv3rr/denv3rr/blob/main/IMG_4225.gif/>    
+  </a>
+</div>
+  <a  href="#about">About</a> |
+  <a href="#features">Features</a> |
+  <a href="#quick-start">Quick Start</a> |
+  <a href="#manual-installation">Manual Install</a> |
+  <a href="#specific-usage">Specific Usage</a> |
+  <a href="#logs">Logs</a> |
+  <a href="#troubleshooting">Troubleshooting</a> |
+  <a href="https://seperet.com">seperet.com</a>
   
 </div>
 
 ---
 
-- Multi-platform Python tool for **network and host security assessment** and **geolocation via IP lookup**.
-- No GUI.
-- **Windows, Linux, and macOS**.
+## About
+
+A Python tool for **network and host security assessment** and **general geolocation via IP lookup**
 
 ---
 
@@ -34,33 +70,29 @@
 
 ---
 
-## Quick Start Options
+## Quick Start
 
-### Run from terminal (any OS)
-
-```bash
-python network_security_tester.py --all
-```
-
-Or for specific modules:
+Run:
 
 ```bash
-python network_security_tester.py --wifi --ports --network
+git clone https://github.com/denv3rr/network-explorer.git
+cd network-explorer
+python run.py
 ```
 
 ---
 
-## Installation
+## Manual Installation
 
 ### **1. Requirements**
 
 - **Python 3.8+**
-- Recommended modules (auto-installed at runtime via `requirements.txt`):
+- Modules (auto-installed at runtime via `requirements.txt`):
   - `requests`
   - `ifaddr`
   - `texttable`
 
-- or install manually before running:
+- or install with this command before running:
 
 ```bash
 pip install -r requirements.txt
@@ -69,13 +101,17 @@ pip install -r requirements.txt
 ### **2. Clone or Download**
 
 ```bash
-git clone https://github.com/denv3rr/network_security_tester.git
-cd network_security_tester
+git clone https://github.com/denv3rr/network-explorer.git
+cd network-explorer
+```
+
+```bash
+python run.py
 ```
 
 ---
 
-## Usage (CLI)
+## Specific Usage
 
 ### **Basic commands**
 
@@ -94,7 +130,7 @@ cd network_security_tester
 
 ---
 
-## 🗂 Logs & Output
+## Logs
 
 - Logs are automatically written to the `logs/` directory.
 - Files follow timestamp format:
@@ -105,7 +141,7 @@ cd network_security_tester
 
 ---
 
-## ⚙️ Troubleshooting
+## Troubleshooting
 
 | Issue | Fix |
 |-------|-----|
@@ -116,14 +152,6 @@ cd network_security_tester
 
 ---
 
-## To Add...
-
-- IPv6 scanning  
-- Advanced OS vulnerability checks  
-- Optional Bleak-based Bluetooth discovery
-
----
-
 [COMMENT]: <LOGO*****************************************>
 <div align="center">
   <a href="https://seperet.com">
@@ -131,3 +159,4 @@ cd network_security_tester
   </a>
 </div>
 <br></br>
+
