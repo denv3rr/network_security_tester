@@ -6,7 +6,7 @@
 
 <div align="center">
 
-  [![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=fff)](#)
+  [![Python](https://img.shields.io/badge/python-3.8+-blue)](#)
   ![GitHub repo size](https://img.shields.io/github/repo-size/denv3rr/network-explorer)
   ![GitHub Created At](https://img.shields.io/github/created-at/denv3rr/network-explorer)
   ![Last Commit](https://img.shields.io/github/last-commit/denv3rr/network-explorer)
@@ -159,4 +159,5 @@ python run.py
   </a>
 </div>
 <br></br>
+
 
