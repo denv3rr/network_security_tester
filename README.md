@@ -9,7 +9,11 @@
   
 </div>
 
-Multi-platform Python tool for **network and host security assessment** and **geolocation via IP lookup**. No GUI. Works on **Windows, Linux, and macOS**.
+---
+
+- Multi-platform Python tool for **network and host security assessment** and **geolocation via IP lookup**.
+- No GUI.
+- **Windows, Linux, and macOS**.
 
 ---
 
@@ -126,9 +130,4 @@ cd network_security_tester
     <img src=https://github.com/denv3rr/denv3rr/blob/main/IMG_4225.gif/>    
   </a>
 </div>
-<<<<<<< HEAD
 <br></br>
-=======
-<br></br>
-
->>>>>>> b2a1da4445fbc9c4494f25b6356d9ca99bf4d660
