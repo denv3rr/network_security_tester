@@ -42,7 +42,7 @@ def print_section(title: str) -> None:
     """Pretty section divider with timestamp + color."""
     stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     line = "=" * 66
-    print(f"\n{C.HEADER}{line}\n{title} — {stamp}\n{line}{C.RESET}")
+    print(f"\n{C.HEADER}{line}\n{title} — {stamp}\n{line}{C.RESET}\n")
 
 def setup_logging() -> None:
     """
@@ -298,16 +298,18 @@ class Scanner:
 # ── CLI ────────────────────────────────────────────────────────────────────────
 
 def choose_port_scan_type(default_code="top") -> str:
-    """Interactive selection for scan type; default keeps things fast."""
+    """Selection for scan type"""
     opts = {
-        "1": ("top",     "Top-ports only (fast triage)"),
+        "1": ("top",     "Top-ports only (fastest, limited)"),
         "2": ("connect", "TCP Connect scan (reliable, slower)"),
-        "3": ("udp",     "UDP scan (slow, limited in this build)"),
+        "3": ("udp",     "UDP scan (limited in this build)"),
     }
-    print("Choose port scan type:")
+    
+    print("Choose port scan type:\n")
+    
     for k, (code, desc) in opts.items():
         print(f"  {k}) {code:7s} — {desc}")
-    sel = (input(f"Selection (default {default_code}): ").strip() or "").lower()
+    sel = (input(f"\n  {C.OK}[Enter]{C.RESET}    — default top-ports scan.\n\nSelection: ").strip() or "").lower()
     if sel in opts:
         return opts[sel][0]
     for _, (code, _) in opts.items():
@@ -319,7 +321,7 @@ def choose_port_scan_type(default_code="top") -> str:
 def main():
     setup_logging()
 
-    parser = argparse.ArgumentParser("Network Security Tester (CLI)")
+    parser = argparse.ArgumentParser("Network Explorer")
     # module toggles
     parser.add_argument("--wifi", action="store_true", help="Run Wi-Fi scan")
     parser.add_argument("--wifi-diag", action="store_true", help="Wi-Fi diagnostic dump (module may print raw outputs)")
@@ -358,7 +360,7 @@ def main():
     if args.silent:
         logging.getLogger().setLevel(logging.WARNING)
 
-    logging.info(f"{C.OK}\nScan started.\n{C.RESET}")
+    logging.info(f"{C.OK}Scan started.{C.RESET}")
 
     # decide which modules to run
     any_flag = any([args.wifi, args.bluetooth, args.os, args.network, args.ports])
@@ -421,7 +423,13 @@ def main():
         except Exception as e:
             logging.error(f"Failed writing JSON: {e}")
 
-    logging.info(f"{C.OK}\n\n==================================================================\n\nScan completed.{C.RESET}\n")
+    print("\n\n\n\n\n\n" + "=" * 70)
+    print(" Network Explorer \n")
+    print(" Visit: https://seperet.com ")
+    print(" Repo: https://github.com/denv3rr/network-explorer ")
+    print("=" * 70 + "\n")
+    logging.info(f"{C.OK}Scan completed.{C.RESET}\n")
+    logging.info(f"Check the {C.OK}logs{C.RESET} folder for more details on scans.\n")
 
 
 if __name__ == "__main__":
