@@ -1,7 +1,5 @@
 <div align="center">
 
-# Network Explorer
-
 </div>
 
 <div align="center">
