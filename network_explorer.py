@@ -132,7 +132,7 @@ def _table_or_lines(headers: list[str], rows: list[list[str]]) -> None:
         print(div)
 
 
-def print_human_summary(results, show_colors: bool) -> None:
+def print_summary(results, show_colors: bool) -> None:
     color = Colors(enabled=show_colors)
     by_mod = {e["module"]: e["result"] for e in results}
 
@@ -544,7 +544,7 @@ def main():
     scanner.run_scan(selected, **scan_options)
 
     # grouped readable summary
-    print_human_summary(scanner.get_results(), show_colors=not args.no_color)
+    print_summary(scanner.get_results(), show_colors=not args.no_color)
 
     if args.json_out:
         try:

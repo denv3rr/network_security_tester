@@ -15,6 +15,21 @@ try:
 except Exception:
     Texttable = None
 
+# ── Colors ─────────────────────
+
+class Colors:
+    def __init__(self, enabled: bool):
+        self.enabled = enabled
+        self.RESET = "\x1b[0m" if enabled else ""
+        self.HEADER = "\x1b[38;5;45m" if enabled else ""     # cyan
+        self.OK = "\x1b[38;5;40m" if enabled else ""         # green
+        self.WARN = "\x1b[38;5;214m" if enabled else ""      # orange
+        self.BAD = "\x1b[38;5;196m" if enabled else ""       # red
+        self.MUTED = "\x1b[38;5;245m" if enabled else ""     # gray
+        self.HIGHLIGHT = "\x1b[38;5;226m" if enabled else "" # yellow
+
+C = Colors(enabled=True)
+
 # ---------- Discovery ----------
 
 def _run_safe(cmd):
@@ -113,7 +128,7 @@ def _progress_bar(done: int, total: int, start_time: float) -> str:
     pct = done / total
     width = 26
     filled = int(pct * width)
-    bar = "█" * filled + "░" * (width - filled)
+    bar = f"{C.HEADER}█{C.RESET}" * filled + f"{C.HEADER}░{C.RESET}" * (width - filled)
     elapsed = max(time.time() - start_time, 0.001)
     rate = done / elapsed
     remaining = (total - done) / rate if rate > 0 else 0
