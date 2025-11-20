@@ -477,7 +477,6 @@ def main():
             c_conn = C.OK if conn in ["Wired", "Wi-Fi"] else C.WARN
             
             print(f"  {C.HEADER}====================================={C.RESET}")
-            print(f"  {C.HIGHLIGHT}[ CURRENT ]{C.RESET}")
             print(f"  Hostname    : {C.OK}{host}{C.RESET}")
             print(f"  Address     : {C.OK}{ip}{C.RESET} ({c_conn}{conn}{C.RESET})")
             if city or country:
