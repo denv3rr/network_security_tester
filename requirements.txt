@@ -1,3 +1,5 @@
 requests
 ifaddr
 texttable
+bleak
+colorama

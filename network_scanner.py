@@ -1,9 +1,6 @@
 # network_scanner.py
-# Wired-friendly metadata:
-# - hostname, OS, best local IPv4
-# - interfaces (name, IPv4/6)
-# - best-effort default gateway
-# - public IP + ISP/ASN + city/region/country + lat/lon (no API key needed)
+# Wired-friendly metadata with added heuristic connection type detection.
+# Python 3.9+
 
 import logging
 import platform
@@ -13,7 +10,6 @@ from typing import Dict, Any, List, Optional
 
 import requests
 import ifaddr
-
 
 def _best_local_ipv4() -> Optional[str]:
     """Return a non-loopback IPv4 by opening a UDP socket to a public IP."""
@@ -26,8 +22,8 @@ def _best_local_ipv4() -> Optional[str]:
             return ip
     except Exception:
         pass
-    # fallback
     try:
+        # fallback
         ip = socket.gethostbyname(socket.gethostname())
         if not ip.startswith("127."):
             return ip
@@ -35,49 +31,56 @@ def _best_local_ipv4() -> Optional[str]:
         pass
     return None
 
+def _detect_connection_type(iface_name: str) -> str:
+    """Heuristic to guess connection type based on interface name."""
+    name = iface_name.lower()
+    if any(x in name for x in ["wi-fi", "wlan", "wireless", "air"]):
+        return "Wi-Fi"
+    if any(x in name for x in ["eth", "en", "ethernet", "lan"]):
+        return "Wired"
+    if "tun" in name or "tap" in name:
+        return "VPN/Tunnel"
+    return "Unknown"
 
 def _list_interfaces() -> List[Dict[str, Any]]:
-    """List adapters and their IPs via ifaddr (pure Python)."""
+    """List adapters and their IPs via ifaddr."""
     out: List[Dict[str, Any]] = []
     try:
         for ad in ifaddr.get_adapters():
             for ip in ad.ips:
                 addr = ip.ip
                 fam = "IPv6" if ":" in str(addr) else "IPv4"
-                out.append({"name": ad.nice_name or ad.name, "ip": str(addr), "family": fam})
+                out.append({
+                    "name": ad.nice_name or ad.name, 
+                    "ip": str(addr), 
+                    "family": fam
+                })
     except Exception as e:
         logging.debug(f"ifaddr error: {e}")
     return out
 
-
 def _gateway_windows() -> Optional[str]:
     try:
-        text = subprocess.run(["ipconfig"], capture_output=True, text=True, check=True).stdout
-        gw = None
+        text = subprocess.run(["ipconfig"], capture_output=True, text=True, check=True, encoding='utf-8', errors='replace').stdout
         for line in text.splitlines():
             if "Default Gateway" in line:
                 parts = line.split(":")
                 if len(parts) >= 2:
                     val = parts[1].strip()
                     if val and val != "0.0.0.0":
-                        gw = val
-                        break
-        return gw
+                        return val
+        return None
     except Exception:
         return None
 
-
 def _gateway_unix() -> Optional[str]:
-    # Try `ip route` then `route -n`
     for cmd in (["ip", "route"], ["route", "-n"], ["netstat", "-rn"]):
         try:
-            text = subprocess.run(cmd, capture_output=True, text=True, check=True).stdout
+            text = subprocess.run(cmd, capture_output=True, text=True, check=True, encoding='utf-8', errors='replace').stdout
             for line in text.splitlines():
                 line = line.strip()
-                if not line:
-                    continue
+                if not line: continue
                 if "default via" in line:
-                    # ip route: "default via 192.168.1.1 dev eth0 ..."
                     try:
                         parts = line.split()
                         idx = parts.index("via")
@@ -85,7 +88,6 @@ def _gateway_unix() -> Optional[str]:
                     except Exception:
                         continue
                 if line.startswith("default") or line.startswith("0.0.0.0"):
-                    # route -n / netstat -rn style
                     parts = line.split()
                     if len(parts) >= 2:
                         return parts[1]
@@ -93,23 +95,17 @@ def _gateway_unix() -> Optional[str]:
             continue
     return None
 
-
 def _default_gateway() -> Optional[str]:
     if platform.system() == "Windows":
         return _gateway_windows()
     return _gateway_unix()
 
-
 def _public_ip_geo() -> Optional[Dict[str, Any]]:
-    """
-    Use ip-api.com first (fast, rich), then ipapi.co as fallback.
-    No API keys required.
-    """
+    """Use ip-api.com (fast, rich) or fallback."""
     try:
-        r = requests.get("http://ip-api.com/json/", timeout=4)
+        r = requests.get("http://ip-api.com/json/", timeout=3)
         if r.ok:
             j = r.json()
-            # fields: query, isp, as, city, regionName, country, lat, lon
             return {
                 "ip": j.get("query"),
                 "isp": j.get("isp"),
@@ -122,29 +118,37 @@ def _public_ip_geo() -> Optional[Dict[str, Any]]:
             }
     except Exception:
         pass
-    try:
-        r = requests.get("https://ipapi.co/json/", timeout=4)
-        if r.ok:
-            j = r.json()
-            return {
-                "ip": j.get("ip"),
-                "isp": j.get("org"),
-                "asn": j.get("asn"),
-                "city": j.get("city"),
-                "region": j.get("region"),
-                "country": j.get("country_name"),
-                "lat": j.get("latitude"),
-                "lon": j.get("longitude"),
-            }
-    except Exception:
-        pass
     return None
 
+def get_quick_identity() -> Dict[str, Any]:
+    """
+    Fast metadata fetch for application startup.
+    """
+    local_ip = _best_local_ipv4()
+    public = _public_ip_geo()
+    
+    # Guess connection type based on the interface holding the local IP
+    conn_type = "Unknown"
+    if local_ip:
+        try:
+            for ad in ifaddr.get_adapters():
+                for ip in ad.ips:
+                    if str(ip.ip) == local_ip:
+                        conn_type = _detect_connection_type(ad.nice_name or ad.name)
+                        break
+        except Exception:
+            pass
+
+    return {
+        "local_ip": local_ip,
+        "public": public,
+        "connection_type": conn_type,
+        "hostname": socket.gethostname()
+    }
 
 def run_network_metadata_scan(output_queue=None, stop_flag=None, **kwargs):
     """
-    Returns dict with: hostname, os, local_ip, interfaces[], gateway?, public{}
-    Works great on **wired** hosts (no Wi-Fi required).
+    Full scan returning all interfaces and details.
     """
     try:
         if stop_flag and getattr(stop_flag, "is_set", lambda: False)():
@@ -157,14 +161,10 @@ def run_network_metadata_scan(output_queue=None, stop_flag=None, **kwargs):
         gateway = _default_gateway()
         public = _public_ip_geo()
 
-        msg = f"Host: {hostname} | Local IP: {local_ip or '?'} | OS: {os_name}"
+        msg = f"Host: {hostname} | Local: {local_ip} | OS: {os_name}"
         logging.info(msg)
         if output_queue:
             output_queue.put(msg)
-            if gateway:
-                output_queue.put(f"  Gateway: {gateway}")
-            if public:
-                output_queue.put(f"  Public: {public.get('ip','?')}  {public.get('isp','') or ''} {public.get('asn') or ''}")
 
         return {
             "hostname": hostname,

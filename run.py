@@ -6,7 +6,7 @@ import subprocess
 import sys
 import os
 
-REQUIRED_PACKAGES = ['requests', 'ifaddr', 'texttable']
+REQUIRED_PACKAGES = ['requests', 'ifaddr', 'texttable', 'bleak', 'colorama']
 
 
 def is_installed(pkg: str) -> bool:
