@@ -1,4 +1,4 @@
-# network_security_tester.py
+# network_explorer.py
 # Clean CLI orchestrator with stable colors, tidy summaries, and safe kwarg passing.
 # Python 3.9+ compatible
 
@@ -65,7 +65,7 @@ def setup_logging() -> None:
 
     os.makedirs("logs", exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    logfile = os.path.join("logs", f"NST_{ts}.log")
+    logfile = os.path.join("logs", f"NEX_{ts}.log")
 
     file_h = logging.FileHandler(logfile, encoding="utf-8")
     console_h = logging.StreamHandler(sys.stdout)

@@ -1,5 +1,5 @@
 # run.py
-# Simple launcher: installs minimal deps and runs main app (network_security_tester.py)
+# Simple launcher: installs minimal deps and runs main app (network_explorer.py)
 
 import importlib.util
 import subprocess
@@ -28,9 +28,9 @@ def main():
     if base_dir not in sys.path:
         sys.path.insert(0, base_dir)
 
-    import network_security_tester  # type: ignore
+    import network_explorer  # type: ignore
 
-    network_security_tester.main()
+    network_explorer.main()
 
 
 if __name__ == "__main__":

@@ -28,14 +28,14 @@
     <img width="100" src=https://github.com/denv3rr/denv3rr/blob/main/IMG_4225.gif/>    
   </a>
 </div>
-  <a  href="#about">About</a> |
-  <a href="#features">Features</a> |
-  <a href="#quick-start">Quick Start</a> |
-  <a href="#manual-installation">Manual Installation</a> |
-  <a href="#specific-usage">Specific Usage</a> |
-  <a href="#logs">Logs</a> |
-  <a href="#troubleshooting">Troubleshooting</a> |
-  <a href="https://seperet.com">seperet.com</a>
+  [About](#about) |
+  [Features](#features) |
+  [Quick Start](#quick-start) |
+  [Manual Installation](#manual-installation) |
+  [Specific Usage](#specific-usage) |
+  [Logs](#logs) |
+  [Troubleshooting](#troubleshooting) |
+  [seperet.com](https://seperet.com)
   
 </div>
 
@@ -123,16 +123,16 @@ pip install -r requirements.txt
 | Action | Command |
 |--------|----------|
 | Quick Start | `python run.py` |
-| Run all modules | `python network_security_tester.py --all` |
-| Wi-Fi scan only | `python network_security_tester.py --wifi` |
-| Port scan (top) | `python network_security_tester.py --ports` |
-| Port scan (custom range) | `python network_security_tester.py --ports 1-2000` |
-| Network metadata (wired support) | `python network_security_tester.py --network` |
-| OS security check | `python network_security_tester.py --os` |
-| Bluetooth scan | `python network_security_tester.py --bluetooth` |
-| Save JSON report | `python network_security_tester.py --all --json results.json` |
-| Disable colors | `python network_security_tester.py --all --no-color` |
-| Silent mode | `python network_security_tester.py --all --silent` |
+| Run all modules | `python run.py --all` |
+| Wi-Fi scan only | `python run.py --wifi` |
+| Port scan (top) | `python run.py --ports` |
+| Port scan (custom range) | `python run.py --ports 1-2000` |
+| Network metadata (wired support) | `python run.py --network` |
+| OS security check | `python run.py --os` |
+| Bluetooth scan | `python run.py --bluetooth` |
+| Save JSON report | `python run.py --all --json results.json` |
+| Disable colors | `python run.py --all --no-color` |
+| Silent mode | `python run.py --all --silent` |
 
 ---
 
@@ -141,7 +141,7 @@ pip install -r requirements.txt
 - Logs are automatically written to the `logs/` directory.
 - Files follow timestamp format:
   ```
-  NST_YYYYMMDD_HHMMSS.log
+  NEX_YYYYMMDD_HHMMSS.log
   ```
 - Old logs (>7 days) are automatically pruned.
 
