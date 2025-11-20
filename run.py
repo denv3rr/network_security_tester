@@ -24,12 +24,6 @@ def check_and_install_requirements():
 def main():
     check_and_install_requirements()
 
-    print("\n" + "=" * 70)
-    print(" Network Explorer \n")
-    print(" Visit: https://seperet.com ")
-    print(" Repo: https://github.com/denv3rr/network-explorer ")
-    print("=" * 70 + "\n")
-
     base_dir = os.path.dirname(os.path.abspath(__file__))
     if base_dir not in sys.path:
         sys.path.insert(0, base_dir)

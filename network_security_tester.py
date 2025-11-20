@@ -555,11 +555,12 @@ def main():
         except Exception as e:
             logging.error(f"Failed writing JSON: {e}")
 
-    print("\n" + "=" * 70)
-    print(f"{C.MUTED} Visit: https://seperet.com{C.RESET}")
-    print(f"{C.MUTED} Repo: https://github.com/denv3rr/network-explorer{C.RESET}")
-    print("=" * 70 + "\n")
+    print("\n\n\n\n")
     logging.info(f"{C.OK}Scan completed.{C.RESET}")
+    print("\n" + "=" * 70)
+    print(f"Visit: {C.MUTED}https://seperet.com{C.RESET}")
+    print(f"Repo: {C.MUTED}https://github.com/denv3rr/network-explorer{C.RESET}")
+    print("=" * 70 + "\n")
 
 
 if __name__ == "__main__":
