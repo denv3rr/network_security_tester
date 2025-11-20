@@ -1,5 +1,8 @@
 <div align="center">
 
+  <div>
+
+  <!-- Shields.io Info -->
   [![Python](https://img.shields.io/badge/python-3.9+-blue)](#)
   ![GitHub repo size](https://img.shields.io/github/repo-size/denv3rr/network-explorer)
   ![GitHub Created At](https://img.shields.io/github/created-at/denv3rr/network-explorer)
@@ -7,15 +10,13 @@
   ![Issues](https://img.shields.io/github/issues/denv3rr/network-explorer)
   ![License](https://img.shields.io/github/license/denv3rr/network-explorer)
   ![Website](https://img.shields.io/website?url=https%3A%2F%2Fseperet.com&label=seperet.com)
-  <div align="center">
-
 
   <!-- OS Icons -->
   <img width="32" alt="image" src="https://github.com/user-attachments/assets/3b32cddc-c6c6-4acc-b2de-d01b30e5613d" />
   <img width="32" alt="image" src="https://github.com/user-attachments/assets/af8dec60-cab6-4c1a-8ea3-9cb2d75e8516" />
   <img width="32" alt="image" src="https://github.com/user-attachments/assets/df923ccd-dd6a-4b86-9864-2c5d6cea4e4a" />
 
-</div>
+  </div>
   
 </div>
 
@@ -28,6 +29,7 @@
     <img width="100" src=https://github.com/denv3rr/denv3rr/blob/main/IMG_4225.gif/>    
   </a>
 </div>
+
   [About](#about) |
   [Features](#features) |
   [Quick Start](#quick-start) |
@@ -110,9 +112,9 @@ pip install -r requirements.txt
 
 ### **3. Run**
   
-- ```bash
-  python run.py
-  ```
+```bash
+python run.py
+```
 
 ---
 
@@ -164,3 +166,4 @@ pip install -r requirements.txt
     <img src=https://github.com/denv3rr/denv3rr/blob/main/IMG_4225.gif/>    
   </a>
 </div>
+
