@@ -1,10 +1,6 @@
 <div align="center">
 
-</div>
-
-<div align="center">
-
-  [![Python](https://img.shields.io/badge/python-3.8+-blue)](#)
+  [![Python](https://img.shields.io/badge/python-3.9+-blue)](#)
   ![GitHub repo size](https://img.shields.io/github/repo-size/denv3rr/network-explorer)
   ![GitHub Created At](https://img.shields.io/github/created-at/denv3rr/network-explorer)
   ![Last Commit](https://img.shields.io/github/last-commit/denv3rr/network-explorer)
@@ -35,7 +31,7 @@
   <a  href="#about">About</a> |
   <a href="#features">Features</a> |
   <a href="#quick-start">Quick Start</a> |
-  <a href="#manual-installation">Manual Install</a> |
+  <a href="#manual-installation">Manual Installation</a> |
   <a href="#specific-usage">Specific Usage</a> |
   <a href="#logs">Logs</a> |
   <a href="#troubleshooting">Troubleshooting</a> |
@@ -47,24 +43,26 @@
 
 ## About
 
-A Python tool for **network and host security assessment** and **general geolocation via IP lookup**
+A Python tool for quick **network and host security assessment**.
 
 ---
 
 ## Features
 
+- **Main Menu**
+  - Launch without flags or arguments to access a user-friendly menu.
 - **Wi-Fi scanning**
-  - Lists visible networks, channels, BSSIDs, and optional BSSID/IP geolocation.
+  - Lists visible networks, channels, BSSIDs, signal strength, and optional BSSID/IP geolocation.
 - **Port scanning**
-  - Multi-threaded, fast “top” mode and full custom ranges.
+  - **Top TCP** (Fast), **Full Connect**, and **UDP** (Payload Probe) modes.
 - **Bluetooth scanning**
-  - Discovers nearby devices (module placeholder; extendable via `bleak`).
+  - Discovers nearby BLE devices with RSSI signal strength and metadata (using `bleak`).
 - **OS security checks**
-  - Detects platform and basic system protection status (stub for future deep checks).
-- **Network metadata scanning (wired or wireless)**
-  - Reports hostname, local IPs, interfaces, gateway, public IP, ISP, ASN, and geographic info.
+  - Detects Firewall status and Antivirus presence on Windows, Linux, and macOS.
+- **Network metadata scanning**
+  - Identifies connection type (Wired/Wi-Fi), local identity, public IP, ISP, ASN, and geographic info.
 - **Full Scan mode**
-  - Runs all modules in a single command.
+  - One-click execution of all modules with intelligent defaults.
 
 ---
 
@@ -82,13 +80,15 @@ python run.py
 
 ## Manual Installation
 
-### **1. Requirements**
+### **1. Check Requirements**
 
-- **Python 3.8+**
-- Modules (auto-installed at runtime via `requirements.txt`):
+- **Python 3.9+**
+- Modules auto-installed at runtime via `requirements.txt`. See <a href="#quick-start">Quick Start</a> above.
   - `requests`
   - `ifaddr`
   - `texttable`
+  - `bleak`
+  - `colorama`
 
 - or install with this command before running:
 
@@ -98,14 +98,21 @@ pip install -r requirements.txt
 
 ### **2. Clone or Download**
 
-```bash
-git clone https://github.com/denv3rr/network-explorer.git
-cd network-explorer
-```
+- Clone
 
-```bash
-python run.py
-```
+  - ```bash
+    git clone https://github.com/denv3rr/network-explorer.git
+    cd network-explorer
+    ```
+- Download
+  
+    - `.zip`:  [network-explorer-main](https://github.com/denv3rr/network-explorer/archive/refs/heads/main.zip)
+
+### **3. Run**
+  
+- ```bash
+  python run.py
+  ```
 
 ---
 
@@ -115,6 +122,7 @@ python run.py
 
 | Action | Command |
 |--------|----------|
+| Quick Start | `python run.py` |
 | Run all modules | `python network_security_tester.py --all` |
 | Wi-Fi scan only | `python network_security_tester.py --wifi` |
 | Port scan (top) | `python network_security_tester.py --ports` |
@@ -156,6 +164,3 @@ python run.py
     <img src=https://github.com/denv3rr/denv3rr/blob/main/IMG_4225.gif/>    
   </a>
 </div>
-<br></br>
-
-
