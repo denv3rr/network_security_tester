@@ -22,8 +22,9 @@ except ImportError:
 from wifi_scan import scan_wifi
 from bluetooth_scan import scan_bluetooth
 from os_security import check_os_security
-from network_scanner import run_network_metadata_scan, get_quick_identity
-from port_scanner import run_port_scan
+from network_scanner import run_network_metadata_scan, get_quick_identity, lookup_target_ip
+from port_scanner import run_port_scan, get_network_devices
+from pentest_tools import run_pentest_suite
 
 try:
     from texttable import Texttable
@@ -275,6 +276,57 @@ def print_summary(results, show_colors: bool) -> None:
             print(f"  {color.MUTED}No Bluetooth devices found or module error.{color.RESET}")
 
 
+# ── Pentest / Inspector ────────────────────────────────────────────────────────
+
+def print_pentest_results(results: dict):
+    print_section("Web / DNS Results")
+    
+    # Web
+    if "web" in results:
+        w = results['web']
+        if "error" in w:
+            print(f"  {C.BAD}Web Error:{C.RESET} {w['error']}")
+        else:
+            print(f"  {C.HIGHLIGHT}Target:{C.RESET} {w['target']}")
+            print(f"  {C.HIGHLIGHT}Server:{C.RESET} {w.get('server')}")
+            
+            missing = w.get('missing_security', [])
+            if missing:
+                print(f"  {C.WARN}Missing Security Headers:{C.RESET}")
+                for m in missing:
+                    print(f"   - {m}")
+            else:
+                print(f"  {C.OK}Basic security headers present.{C.RESET}")
+
+    # DNS
+    if "dns" in results:
+        d = results['dns']
+        print(f"\n  {C.HIGHLIGHT}DNS Records:{C.RESET}")
+        for k, v in d.items():
+            print(f"   {k}: {v}")
+
+
+# ── IP / Domain Lookup ─────────────────────────────────────────────────────────
+
+def print_lookup_results(data: dict):
+    print_section("IP/Domain Lookup Results")
+    if "error" in data:
+        print(f"  {C.BAD}Error:{C.RESET} {data['error']}")
+        # Return to main menu
+        return main()
+
+    print(f"  {C.HIGHLIGHT}Target:{C.RESET} {data.get('target')} ({data.get('resolved_ip')})")
+    print(f"  {C.HIGHLIGHT}ISP/Org:{C.RESET} {data.get('isp')} / {data.get('org')}")
+    print(f"  {C.HIGHLIGHT}Location:{C.RESET} {data.get('city')}, {data.get('country')}")
+    print(f"  {C.HIGHLIGHT}Coords:{C.RESET} {data.get('lat')}, {data.get('lon')}")
+    print(f"  {C.HIGHLIGHT}Timezone:{C.RESET} {data.get('timezone')}")
+    print(f"  {C.HIGHLIGHT}AS Number:{C.RESET} {data.get('as')}")
+    print("")
+
+    # Return to main menu
+    return main()
+
+
 # ── Orchestrator ───────────────────────────────────────────────────────────────
 
 class Scanner:
@@ -291,80 +343,56 @@ class Scanner:
             "ports":     self._run_port_scan,
         }
 
-    def _run_port_scan(
-        self,
-        *,
-        port_range="1-1024",
-        scan_type="top",
-        protocol="tcp",
-        hosts=None,
-        no_banner=True,
-        timeout=0.30,
-        workers=256,
-        **_ignored,
-    ):
+    def _run_port_scan(self, **kwargs):
+        # Wrapper logic remains the same
         try:
-            start_port, end_port = map(int, str(port_range).split("-"))
+            start_port, end_port = map(int, str(kwargs.get("port_range", "1-1024")).split("-"))
         except Exception:
-            logging.warning("Invalid port range; fallback to 1-1024.")
             start_port, end_port = 1, 1024
 
         return run_port_scan(
             start_port=start_port,
             end_port=end_port,
-            scan_type=scan_type,
-            protocol=protocol,
-            target_hosts=hosts,
-            no_banner=no_banner,
-            timeout=timeout,
-            workers=workers,
+            scan_type=kwargs.get("scan_type", "top"),
+            protocol=kwargs.get("protocol", "tcp"),
+            target_hosts=kwargs.get("hosts"),
+            no_banner=kwargs.get("no_banner", True),
+            timeout=kwargs.get("timeout", 0.30),
+            workers=kwargs.get("workers", 256),
             stop_flag=self.stop_flag,
             output_queue=self.output_queue,
         )
 
     def run_scan(self, selected_modules=None, **scan_options):
+        # Wrapper logic remains the same
         if not selected_modules:
             selected_modules = list(self.scan_functions.keys())
 
         common = {"stop_flag": self.stop_flag, "output_queue": self.output_queue}
-        total_steps = len(selected_modules)
-        
+        total = len(selected_modules)
+
         for i, module in enumerate(selected_modules, 1):
-            # Step Indicator
-            if not scan_options.get("silent", False):
-                print(f"  {C.MUTED}Step [{i}/{total_steps}]: Running {module} scan...{C.RESET}")
-
+            if not scan_options.get("silent"):
+                print(f"  {C.MUTED}Step [{i}/{total}]: Running {module} scan...{C.RESET}")
+            
             func = self.scan_functions.get(module)
-            if not func:
-                logging.warning(f"Unknown module: {module}")
-                continue
-            try:
-                if module == "wifi":
-                    result = func(
-                        wifi_interface=scan_options.get("wifi_interface"),
-                        do_geolocation=scan_options.get("geo", False),
-                        diag=scan_options.get("diag", False),
-                        **common,
-                    )
-                elif module == "ports":
-                    result = func(
-                        port_range=scan_options.get("port_range", self.port_range),
-                        scan_type=scan_options.get("scan_type", "top"),
-                        protocol=scan_options.get("protocol", "tcp"),
-                        hosts=scan_options.get("hosts"),
-                        no_banner=scan_options.get("no_banner", True),
-                        timeout=scan_options.get("timeout", 0.30),
-                        workers=scan_options.get("workers", 256),
-                        **common,
-                    )
-                else:
-                    result = func(**common)
-
-                self.results.append({"module": module, "result": result})
-
-            except Exception as e:
-                logging.error(f"{module} scan error: {e}", exc_info=True)
-                self.results.append({"module": module, "result": f"Error: {e}"})
+            if func:
+                # Pass all options, let modules ignore what they don't need or wrapper handle it
+                try:
+                    # Explicit mapping for modules that need specific args
+                    if module == "wifi":
+                        res = func(wifi_interface=scan_options.get("wifi_interface"), 
+                                    do_geolocation=scan_options.get("geo"), 
+                                    diag=scan_options.get("diag"), **common)
+                    elif module == "ports":
+                        # _run_port_scan handles the extraction
+                        res = self._run_port_scan(**scan_options) 
+                    else:
+                        res = func(**common)
+                    
+                    self.results.append({"module": module, "result": res})
+                except Exception as e:
+                    logging.error(f"Error in {module}: {e}")
 
     def get_results(self):
         return self.results
@@ -374,7 +402,6 @@ class Scanner:
 
 def choose_port_scan_type() -> tuple[str, str]:
     """Selection for scan type and protocol"""
-    # Clearer alignment
     print(f"\n  {C.HEADER}Port Scan Configuration{C.RESET}\n")
     print(f"  {C.HIGHLIGHT}1.{C.RESET} Top TCP ports {C.MUTED}(Fast, Recommended){C.RESET}")
     print(f"  {C.HIGHLIGHT}2.{C.RESET} Full Connect TCP {C.MUTED}(Slower, more accurate){C.RESET}")
@@ -384,39 +411,51 @@ def choose_port_scan_type() -> tuple[str, str]:
     
     if sel == "2": return "connect", "tcp"
     if sel == "3": return "top", "udp"
-    return "top", "tcp" # Default
+    return "top", "tcp"
 
-def main_menu() -> tuple[list[str], bool]:
-    """Interactive Main Menu. Returns (modules, auto_mode_bool)"""
+def main_menu() -> tuple[list[str], bool, str]:
+    """
+    Interactive Main Menu. 
+    Returns: (list_of_modules, auto_mode_bool, specific_action_string)
+    """
     print(f"{C.HEADER}  Select Scan Mode:{C.RESET}\n")
-    print(f"  {C.HIGHLIGHT}1.{C.RESET} Full Scan")
+    print(f"  {C.HIGHLIGHT}1.{C.RESET} Full Scan (One-Click)")
     print(f"  {C.HIGHLIGHT}2.{C.RESET} Wi-Fi Scan")
     print(f"  {C.HIGHLIGHT}3.{C.RESET} Port Scan (Interactive)")
-    print(f"  {C.HIGHLIGHT}4.{C.RESET} Network Metadata & Host Info")
-    print(f"  {C.HIGHLIGHT}5.{C.RESET} OS Security Check")
-    print(f"  {C.HIGHLIGHT}6.{C.RESET} Bluetooth Scan")
+    print(f"  {C.HIGHLIGHT}4.{C.RESET} LAN Device Discovery (ARP Scan)")
+    print(f"  {C.HIGHLIGHT}5.{C.RESET} Web & DNS Inspector")
+    print(f"  {C.HIGHLIGHT}6.{C.RESET} IP/Domain Lookup")
+    print(f"  {C.HIGHLIGHT}7.{C.RESET} Network Metadata (Self)")
+    print(f"  {C.HIGHLIGHT}8.{C.RESET} OS Security Check")
+    print(f"  {C.HIGHLIGHT}9.{C.RESET} Bluetooth Scan")
     print(f"  {C.HIGHLIGHT}0.{C.RESET} Exit")
     
     choice = input(f"\n  {C.OK}>{C.RESET}  ").strip()
     
-    if choice == "1": return (["wifi", "bluetooth", "os", "network", "ports"], True) # Auto True
-    if choice == "2": return (["wifi"], True)
-    if choice == "3": return (["ports"], False) # Auto False (Ask me!)
-    if choice == "4": return (["network"], True)
-    if choice == "5": return (["os"], True)
-    if choice == "6": return (["bluetooth"], True)
+    # Returns: modules, auto_mode, special_action_key
+    if choice == "1": return (["wifi", "bluetooth", "os", "network", "ports"], True, None)
+    if choice == "2": return (["wifi"], True, None)
+    if choice == "3": return (["ports"], False, None)
+    if choice == "4": return ([], True, "lan_discovery")
+    if choice == "5": return ([], True, "pentest")
+    if choice == "6": return ([], True, "lookup")
+    if choice == "7": return (["network"], True, None)
+    if choice == "8": return (["os"], True, None)
+    if choice == "9": return (["bluetooth"], True, None)
     if choice == "0": sys.exit(0)
     
-    print(f"  {C.WARN}Invalid choice, running Full Scan by default.{C.RESET}")
-    return (["wifi", "bluetooth", "os", "network", "ports"], True)
+    print(f"  {C.WARN}Invalid choice, running Full Scan.{C.RESET}")
+    return (["wifi", "bluetooth", "os", "network", "ports"], True, None)
+
+
+# ── Main ───────────────────────────────────────────────────────────────────────
 
 def main():
     setup_logging()
-
     parser = argparse.ArgumentParser("Network Explorer")
+
     # module toggles
     parser.add_argument("--wifi", action="store_true", help="Run Wi-Fi scan")
-    parser.add_argument("--wifi-diag", action="store_true", help="Wi-Fi diagnostic dump")
     parser.add_argument("--bluetooth", action="store_true", help="Run Bluetooth scan")
     parser.add_argument("--os", action="store_true", help="Run OS security scan")
     parser.add_argument("--network", action="store_true", help="Run Network metadata scan")
@@ -432,6 +471,8 @@ def main():
     # Wi-Fi options
     parser.add_argument("--geo", action="store_true", help="Wi-Fi geolocation")
     parser.add_argument("--wifi_interface", help="Specify Wi-Fi interface")
+    parser.add_argument("--wifi-diag", action="store_true", help="Wi-Fi diagnostic dump")
+
 
     # output & run style
     parser.add_argument("--json", dest="json_out", help="Write full results to a JSON file")
@@ -488,13 +529,14 @@ def main():
 
     # Check for any command line flags
     any_flag = any([args.wifi, args.bluetooth, args.os, args.network, args.ports, args.all])
+    special_action = None
     auto_mode = False
 
     if any_flag:
         # CLI usage
         if args.all:
-             selected = ["wifi", "bluetooth", "os", "network", "ports"]
-             auto_mode = True # Assume auto if --all is passed
+            selected = ["wifi", "bluetooth", "os", "network", "ports"]
+            auto_mode = True # Assume auto if --all is passed
         else:
             selected = []
             if args.wifi:      selected.append("wifi")
@@ -504,9 +546,38 @@ def main():
             if args.ports:     selected.append("ports")
     else:
         # Interactive Menu usage
-        selected, auto_mode = main_menu()
+        selected, auto_mode, special_action = main_menu()
         print("")
         logging.info(f"{C.OK}Scan started.{C.RESET}\n")
+
+    # Handle Special Actions
+    if special_action == "lookup":
+        target = input(f"  {C.OK}Enter IP or Domain to lookup:{C.RESET} ").strip()
+        res = lookup_target_ip(target)
+        print_lookup_results(res)
+        # End here or loop? ---------------------------------------------------------------------------------------------------------------------
+        sys.exit(0)
+
+    if special_action == "pentest":
+        target = input(f"  {C.OK}Enter Target IP/Domain:{C.RESET} ").strip()
+        print(f"\n  {C.MUTED}Running checks...{C.RESET}")
+        res = run_pentest_suite(target)
+        print_pentest_results(res)
+        return main()
+        sys.exit(0)
+
+    if special_action == "lan_discovery":
+        print(f"  {C.MUTED}Scanning local ARP table / Neighbors...{C.RESET}")
+        devs = get_network_devices()
+        print_section("LAN Discovery (ARP/Neighbor)")
+        if devs["IPv4"]:
+            for ip in devs["IPv4"]:
+                print(f"  - {ip}")
+            return main()
+        else:
+            print("  No neighbors found.")
+            return main()
+        sys.exit(0)
 
     # options to propagate
     scan_options = {}
@@ -518,27 +589,21 @@ def main():
 
     # port scan configuration
     if "ports" in selected:
-        # If auto_mode is True (Full Scan selected), skip the prompt
         if args.fast or args.silent or auto_mode:
             scan_options["scan_type"] = "top"
             scan_options["protocol"] = "tcp"
             scan_options["no_banner"] = True
-            if args.timeout is None: scan_options["timeout"] = 0.15
-            if args.workers is None: scan_options["workers"] = 300
-            
-            # Only print if it's not silent and we are in auto mode
+            scan_options["timeout"] = 0.15 if args.timeout is None else args.timeout
+            scan_options["workers"] = 300 if args.workers is None else args.workers
             if not args.silent:
                 print(f"  {C.OK}[AUTO]{C.RESET} Running Fast Port Scan (Top TCP)...")
         else:
-            # Interactive Choice for UDP/TCP
             stype, proto = choose_port_scan_type()
             scan_options["scan_type"] = stype
             scan_options["protocol"] = proto
             scan_options["no_banner"] = bool(args.no_banner)
-        
+            
         if args.ports: scan_options["port_range"] = args.ports
-        if args.timeout is not None: scan_options["timeout"] = args.timeout
-        if args.workers is not None: scan_options["workers"] = args.workers
 
     scanner = Scanner(port_range=args.ports if args.ports else "1-1024")
     scanner.run_scan(selected, **scan_options)
@@ -560,6 +625,9 @@ def main():
     print(f"Visit: {C.MUTED}https://seperet.com{C.RESET}")
     print(f"Repo: {C.MUTED}https://github.com/denv3rr/network-explorer{C.RESET}")
     print("=" * 70 + "\n")
+
+    # Return to main menu
+    return main()
 
 
 if __name__ == "__main__":

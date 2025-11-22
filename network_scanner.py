@@ -100,6 +100,42 @@ def _default_gateway() -> Optional[str]:
         return _gateway_windows()
     return _gateway_unix()
 
+def lookup_target_ip(target: str) -> Dict[str, Any]:
+    """
+    Geo-locate a specific IP address or Domain.
+    """
+    try:
+        # Resolve domain to IP if needed
+        try:
+            target_ip = socket.gethostbyname(target)
+        except:
+            return {"error": f"Could not resolve domain: {target}"}
+
+        # Use ip-api
+        r = requests.get(f"http://ip-api.com/json/{target_ip}", timeout=5)
+        if r.ok:
+            j = r.json()
+            if j.get("status") == "fail":
+                return {"error": j.get("message", "Lookup failed")}
+            
+            return {
+                "target": target,
+                "resolved_ip": target_ip,
+                "isp": j.get("isp"),
+                "org": j.get("org"),
+                "as": j.get("as"),
+                "city": j.get("city"),
+                "country": j.get("country"),
+                "lat": j.get("lat"),
+                "lon": j.get("lon"),
+                "timezone": j.get("timezone")
+            }
+        else:
+            return {"error": f"API request failed code {r.status_code}"}
+    except Exception as e:
+        return {"error": str(e)}
+# --- NEW ADDITION END ---
+
 def _public_ip_geo() -> Optional[Dict[str, Any]]:
     """Use ip-api.com (fast, rich) or fallback."""
     try:
