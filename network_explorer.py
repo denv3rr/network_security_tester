@@ -19,18 +19,20 @@ try:
 except ImportError:
     pass
 
+# Imports
 from wifi_scan import scan_wifi
 from bluetooth_scan import scan_bluetooth
 from os_security import check_os_security
-from network_scanner import run_network_metadata_scan, get_quick_identity, lookup_target_ip
-from port_scanner import run_port_scan, get_network_devices
+# UPDATED: Imported get_network_devices from network_scanner (the Rich version)
+from network_scanner import run_network_metadata_scan, get_quick_identity, lookup_target_ip, get_network_devices
+# UPDATED: Removed get_network_devices from here to avoid conflict
+from port_scanner import run_port_scan 
 from pentest_tools import run_pentest_suite
 
 try:
     from texttable import Texttable
 except Exception:
     Texttable = None
-
 
 # ── Colors ─────────────────────────────────────────────────────────────────────
 
@@ -47,7 +49,6 @@ class Colors:
 
 C = Colors(enabled=True)
 
-
 # ── Console helpers ────────────────────────────────────────────────────────────
 
 def print_section(title: str) -> None:
@@ -56,32 +57,34 @@ def print_section(title: str) -> None:
     line = "=" * 60
     print(f"\n{C.HEADER}{line}\n {title} — {stamp}\n{line}{C.RESET}\n")
 
-def setup_logging() -> None:
-    if hasattr(sys.stdout, 'reconfigure'):
-        try:
-            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-        except Exception:
-            pass
+def setup_logging(silent: bool = False) -> None:
+    """
+    Sets up logging handlers. Ensures we don't duplicate handlers on reload.
+    """
+    root = logging.getLogger()
+    
+    # If handlers exist, clear them to avoid duplicates
+    if root.hasHandlers():
+        root.handlers.clear()
 
+    if silent:
+        root.setLevel(logging.WARNING)
+    else:
+        root.setLevel(logging.INFO)
+
+    # File Handler
     os.makedirs("logs", exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     logfile = os.path.join("logs", f"NEX_{ts}.log")
-
-    file_h = logging.FileHandler(logfile, encoding="utf-8")
-    console_h = logging.StreamHandler(sys.stdout)
     
+    file_h = logging.FileHandler(logfile, encoding="utf-8")
     fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
     file_h.setFormatter(fmt)
-    console_h.setFormatter(fmt)
-
-    root = logging.getLogger()
-    root.setLevel(logging.INFO)
-    
-    if root.hasHandlers():
-        root.handlers.clear()
-        
     root.addHandler(file_h)
+
+    # Console Handler (Stream)
+    console_h = logging.StreamHandler(sys.stdout)
+    console_h.setFormatter(fmt)
     root.addHandler(console_h)
     
     # Prune old logs
@@ -279,7 +282,7 @@ def print_summary(results, show_colors: bool) -> None:
 # ── Pentest / Inspector ────────────────────────────────────────────────────────
 
 def print_pentest_results(results: dict):
-    print_section("Web / DNS Results")
+    print_section("Inspector Results")
     
     # Web
     if "web" in results:
@@ -298,6 +301,17 @@ def print_pentest_results(results: dict):
             else:
                 print(f"  {C.OK}Basic security headers present.{C.RESET}")
 
+    # SSL
+    if "ssl" in results:
+        s = results['ssl']
+        if "error" in s:
+             print(f"\n  {C.WARN}SSL/TLS:{C.RESET} {s['error']}")
+        else:
+             print(f"\n  {C.HIGHLIGHT}SSL Certificate:{C.RESET}")
+             print(f"   Issuer: {s.get('issuer')}")
+             print(f"   Expires: {s.get('expiry')}")
+             print(f"   Valid: {C.OK}{s.get('valid')}{C.RESET}")
+
     # DNS
     if "dns" in results:
         d = results['dns']
@@ -312,19 +326,16 @@ def print_lookup_results(data: dict):
     print_section("IP/Domain Lookup Results")
     if "error" in data:
         print(f"  {C.BAD}Error:{C.RESET} {data['error']}")
-        # Return to main menu
-        return main()
+        return 
 
-    print(f"  {C.HIGHLIGHT}Target:{C.RESET} {data.get('target')} ({data.get('resolved_ip')})")
+    print("  ==========================================================")
+    print(f"  {C.HIGHLIGHT}Target:{C.RESET} {data.get('target')} | {C.OK}Resolved:{C.RESET} {data.get('resolved_ip')}")
     print(f"  {C.HIGHLIGHT}ISP/Org:{C.RESET} {data.get('isp')} / {data.get('org')}")
     print(f"  {C.HIGHLIGHT}Location:{C.RESET} {data.get('city')}, {data.get('country')}")
     print(f"  {C.HIGHLIGHT}Coords:{C.RESET} {data.get('lat')}, {data.get('lon')}")
     print(f"  {C.HIGHLIGHT}Timezone:{C.RESET} {data.get('timezone')}")
     print(f"  {C.HIGHLIGHT}AS Number:{C.RESET} {data.get('as')}")
-    print("")
-
-    # Return to main menu
-    return main()
+    print("  ==========================================================\n")
 
 
 # ── Orchestrator ───────────────────────────────────────────────────────────────
@@ -344,7 +355,7 @@ class Scanner:
         }
 
     def _run_port_scan(self, **kwargs):
-        # Wrapper logic remains the same
+        # Wrapper logic 
         try:
             start_port, end_port = map(int, str(kwargs.get("port_range", "1-1024")).split("-"))
         except Exception:
@@ -364,7 +375,6 @@ class Scanner:
         )
 
     def run_scan(self, selected_modules=None, **scan_options):
-        # Wrapper logic remains the same
         if not selected_modules:
             selected_modules = list(self.scan_functions.keys())
 
@@ -377,7 +387,6 @@ class Scanner:
             
             func = self.scan_functions.get(module)
             if func:
-                # Pass all options, let modules ignore what they don't need or wrapper handle it
                 try:
                     # Explicit mapping for modules that need specific args
                     if module == "wifi":
@@ -385,7 +394,6 @@ class Scanner:
                                     do_geolocation=scan_options.get("geo"), 
                                     diag=scan_options.get("diag"), **common)
                     elif module == "ports":
-                        # _run_port_scan handles the extraction
                         res = self._run_port_scan(**scan_options) 
                     else:
                         res = func(**common)
@@ -422,7 +430,7 @@ def main_menu() -> tuple[list[str], bool, str]:
     print(f"  {C.HIGHLIGHT}1.{C.RESET} Full Scan (One-Click)")
     print(f"  {C.HIGHLIGHT}2.{C.RESET} Wi-Fi Scan")
     print(f"  {C.HIGHLIGHT}3.{C.RESET} Port Scan (Interactive)")
-    print(f"  {C.HIGHLIGHT}4.{C.RESET} LAN Device Discovery (ARP Scan)")
+    print(f"  {C.HIGHLIGHT}4.{C.RESET} LAN Device Discovery (ARP + Vendor)")
     print(f"  {C.HIGHLIGHT}5.{C.RESET} Web & DNS Inspector")
     print(f"  {C.HIGHLIGHT}6.{C.RESET} IP/Domain Lookup")
     print(f"  {C.HIGHLIGHT}7.{C.RESET} Network Metadata (Self)")
@@ -451,30 +459,24 @@ def main_menu() -> tuple[list[str], bool, str]:
 # ── Main ───────────────────────────────────────────────────────────────────────
 
 def main():
-    setup_logging()
+    # 1. Setup Arguments
     parser = argparse.ArgumentParser("Network Explorer")
-
-    # module toggles
     parser.add_argument("--wifi", action="store_true", help="Run Wi-Fi scan")
     parser.add_argument("--bluetooth", action="store_true", help="Run Bluetooth scan")
     parser.add_argument("--os", action="store_true", help="Run OS security scan")
     parser.add_argument("--network", action="store_true", help="Run Network metadata scan")
     parser.add_argument("--ports", nargs="?", const="1-1024", help="Port scan range")
-
-    # tuning
+    # Tuning
     parser.add_argument("--host", "--hosts", dest="hosts", help="Target host(s)")
     parser.add_argument("--fast", action="store_true", help="Force fast mode")
     parser.add_argument("--no-banner", action="store_true", help="Skip banner grabbing")
     parser.add_argument("--timeout", type=float, default=None)
     parser.add_argument("--workers", type=int, default=None)
-
-    # Wi-Fi options
+    # Wi-Fi
     parser.add_argument("--geo", action="store_true", help="Wi-Fi geolocation")
     parser.add_argument("--wifi_interface", help="Specify Wi-Fi interface")
     parser.add_argument("--wifi-diag", action="store_true", help="Wi-Fi diagnostic dump")
-
-
-    # output & run style
+    # Output
     parser.add_argument("--json", dest="json_out", help="Write full results to a JSON file")
     parser.add_argument("--all", action="store_true", help="Run all modules")
     parser.add_argument("--silent", action="store_true", help="Reduce console chatter")
@@ -482,13 +484,14 @@ def main():
 
     args = parser.parse_args()
 
+    # 2. Setup Globals
     global C
     C = Colors(enabled=not args.no_color)
+    
+    # 3. Setup Logging ONCE
+    setup_logging(silent=args.silent)
 
-    if args.silent:
-        logging.getLogger().setLevel(logging.WARNING)
-
-    # Header
+    # 4. Print Header
     print(f"{C.HEADER}")
     print(r"""
                __                      __  
@@ -503,40 +506,14 @@ def main():
         /_/                                """)
     print("")
 
-    # --- IDENTITY BLOCK ---
-    if not args.silent:
-        try:
-            ident = get_quick_identity()
-            ip = ident.get("local_ip") or "?"
-            host = ident.get("hostname") or "?"
-            conn = ident.get("connection_type") or "Unknown"
-            
-            pub = ident.get("public") or {}
-            city = pub.get("city") or ""
-            country = pub.get("country") or ""
-            
-            c_conn = C.OK if conn in ["Wired", "Wi-Fi"] else C.WARN
-            
-            print(f"  {C.HEADER}====================================={C.RESET}")
-            print(f"  Hostname    : {C.OK}{host}{C.RESET}")
-            print(f"  Address     : {C.OK}{ip}{C.RESET} ({c_conn}{conn}{C.RESET})")
-            if city or country:
-                print(f"  Location    : {C.MUTED}{city}, {country}{C.RESET}")
-            if pub.get('ip'):
-                print(f"  Public IP   : {C.MUTED}{pub.get('ip')}{C.RESET}")
-            print(f"  {C.HEADER}====================================={C.RESET}\n\n\n") 
-        except Exception: pass
-
-    # Check for any command line flags
+    # 5. One-Shot CLI Check
     any_flag = any([args.wifi, args.bluetooth, args.os, args.network, args.ports, args.all])
-    special_action = None
-    auto_mode = False
-
+    
     if any_flag:
-        # CLI usage
+        # Non-Interactive Mode
         if args.all:
             selected = ["wifi", "bluetooth", "os", "network", "ports"]
-            auto_mode = True # Assume auto if --all is passed
+            auto_mode = True
         else:
             selected = []
             if args.wifi:      selected.append("wifi")
@@ -544,42 +521,103 @@ def main():
             if args.os:        selected.append("os")
             if args.network:   selected.append("network")
             if args.ports:     selected.append("ports")
-    else:
-        # Interactive Menu usage
+            auto_mode = False 
+
+        # Execute Scan
+        _run_scan_logic(selected, auto_mode, args)
+        return # Exit after CLI scan
+
+    # 6. Interactive Loop
+    if not args.silent:
+        _print_identity()
+
+    while True:
         selected, auto_mode, special_action = main_menu()
         print("")
+        
+        # Handle Lookup Tool
+        if special_action == "lookup":
+            while True:
+                print(f"\n  {C.HEADER}:: IP/Domain Lookup ::{C.RESET}")
+                target = input(f"  {C.OK}Enter IP/Domain (or '1' for Menu, '0' for Exit):{C.RESET} ").strip()
+                
+                if target == '1': break
+                if target == '0': sys.exit(0)
+                if not target: continue
+
+                res = lookup_target_ip(target)
+                print_lookup_results(res)
+            continue
+
+        # Handle Pentest Tool
+        if special_action == "pentest":
+            while True:
+                print(f"\n  {C.HEADER}:: Web & DNS Inspector ::{C.RESET}")
+                target = input(f"  {C.OK}Enter Target IP/Domain (or '1' for Menu, '0' for Exit):{C.RESET} ").strip()
+                
+                if target == '1': break
+                if target == '0': sys.exit(0)
+                if not target: continue
+
+                print(f"\n  {C.MUTED}Running checks...{C.RESET}")
+                res = run_pentest_suite(target)
+                print_pentest_results(res)
+            continue
+
+        # Handle LAN Discovery
+        if special_action == "lan_discovery":
+            while True:
+                print(f"  {C.MUTED}Scanning local ARP table / Neighbors...{C.RESET}")
+                devs = get_network_devices() # Now using the correct version
+                print_section("LAN Discovery (ARP/Neighbor)")
+                
+                if devs["IPv4"]:
+                    rows = []
+                    for item in devs["IPv4"]:
+                        rows.append([item['ip'], item['mac'], item['vendor']])
+                    _table_or_lines(["IP Address", "MAC Address", "Vendor"], rows)
+                else:
+                    print("  No neighbors found.")
+                
+                choice = input(f"\n  {C.OK}[Enter] Rescan, '1' Menu, '0' Exit:{C.RESET} ").strip()
+                if choice == '1': break
+                if choice == '0': sys.exit(0)
+            continue
+
+        # Handle Standard Scans
         logging.info(f"{C.OK}Scan started.{C.RESET}\n")
+        _run_scan_logic(selected, auto_mode, args)
+        
+        print("\n" + "=" * 70)
+        print(f"Visit: {C.MUTED}https://seperet.com{C.RESET}")
+        print(f"Repo: {C.MUTED}https://github.com/denv3rr/network-explorer{C.RESET}")
+        print("=" * 70 + "\n")
+        
+        # Loop restarts here automatically
 
-    # Handle Special Actions
-    if special_action == "lookup":
-        target = input(f"  {C.OK}Enter IP or Domain to lookup:{C.RESET} ").strip()
-        res = lookup_target_ip(target)
-        print_lookup_results(res)
-        # End here or loop? ---------------------------------------------------------------------------------------------------------------------
-        sys.exit(0)
-
-    if special_action == "pentest":
-        target = input(f"  {C.OK}Enter Target IP/Domain:{C.RESET} ").strip()
-        print(f"\n  {C.MUTED}Running checks...{C.RESET}")
-        res = run_pentest_suite(target)
-        print_pentest_results(res)
-        return main()
-        sys.exit(0)
-
-    if special_action == "lan_discovery":
-        print(f"  {C.MUTED}Scanning local ARP table / Neighbors...{C.RESET}")
-        devs = get_network_devices()
-        print_section("LAN Discovery (ARP/Neighbor)")
-        if devs["IPv4"]:
-            for ip in devs["IPv4"]:
-                print(f"  - {ip}")
-            return main()
+def _print_identity():
+    try:
+        ident = get_quick_identity()
+        ip = ident.get("local_ip") or "?"
+        host = ident.get("hostname") or "?"
+        conn = ident.get("connection_type") or "Unknown"
+        pub = ident.get("public") or {}
+        c_conn = C.OK if conn in ["Wired", "Wi-Fi"] else C.WARN
+        
+        print(f"  {C.HEADER}====================================={C.RESET}")
+        print(f"  Hostname    : {C.OK}{host}{C.RESET}")
+        print(f"  Address     : {C.OK}{ip}{C.RESET} ({c_conn}{conn}{C.RESET})")
+        if pub.get('city'):
+            print(f"  Location    : {C.MUTED}{pub.get('city')}, {pub.get('country')}{C.RESET}")
+        if pub.get('ip'):
+            print(f"  Public IP   : {C.MUTED}{pub.get('ip')}{C.RESET}")
         else:
-            print("  No neighbors found.")
-            return main()
-        sys.exit(0)
+            print(f"  Public IP   : {C.BAD}Unavailable{C.RESET}")
+        print(f"  {C.HEADER}====================================={C.RESET}\n\n\n") 
+    except: pass
 
-    # options to propagate
+def _run_scan_logic(selected, auto_mode, args):
+    """Helper to run the actual Scanner orchestrator to avoid code duplication."""
     scan_options = {}
     if args.wifi_interface: scan_options["wifi_interface"] = args.wifi_interface
     if args.geo: scan_options["geo"] = True
@@ -587,7 +625,6 @@ def main():
     if args.hosts: scan_options["hosts"] = [h.strip() for h in args.hosts.split(",") if h.strip()]
     if args.silent: scan_options["silent"] = True
 
-    # port scan configuration
     if "ports" in selected:
         if args.fast or args.silent or auto_mode:
             scan_options["scan_type"] = "top"
@@ -608,7 +645,6 @@ def main():
     scanner = Scanner(port_range=args.ports if args.ports else "1-1024")
     scanner.run_scan(selected, **scan_options)
 
-    # grouped readable summary
     print_summary(scanner.get_results(), show_colors=not args.no_color)
 
     if args.json_out:
@@ -619,15 +655,8 @@ def main():
         except Exception as e:
             logging.error(f"Failed writing JSON: {e}")
 
-    print("\n\n\n\n")
+    print("\n\n")
     logging.info(f"{C.OK}Scan completed.{C.RESET}")
-    print("\n" + "=" * 70)
-    print(f"Visit: {C.MUTED}https://seperet.com{C.RESET}")
-    print(f"Repo: {C.MUTED}https://github.com/denv3rr/network-explorer{C.RESET}")
-    print("=" * 70 + "\n")
-
-    # Return to main menu
-    return main()
 
 
 if __name__ == "__main__":

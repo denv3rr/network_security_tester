@@ -1,18 +1,20 @@
 # network_scanner.py
-# Wired-friendly metadata with added heuristic connection type detection.
+# Wired-friendly metadata, IP lookup, connection type detection, and LAN discovery.
 # Python 3.9+
 
 import logging
 import platform
 import socket
 import subprocess
+import re
 from typing import Dict, Any, List, Optional
 
 import requests
 import ifaddr
 
+# --- CORE HELPERS ---
+
 def _best_local_ipv4() -> Optional[str]:
-    """Return a non-loopback IPv4 by opening a UDP socket to a public IP."""
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
@@ -23,7 +25,6 @@ def _best_local_ipv4() -> Optional[str]:
     except Exception:
         pass
     try:
-        # fallback
         ip = socket.gethostbyname(socket.gethostname())
         if not ip.startswith("127."):
             return ip
@@ -32,7 +33,6 @@ def _best_local_ipv4() -> Optional[str]:
     return None
 
 def _detect_connection_type(iface_name: str) -> str:
-    """Heuristic to guess connection type based on interface name."""
     name = iface_name.lower()
     if any(x in name for x in ["wi-fi", "wlan", "wireless", "air"]):
         return "Wi-Fi"
@@ -43,7 +43,6 @@ def _detect_connection_type(iface_name: str) -> str:
     return "Unknown"
 
 def _list_interfaces() -> List[Dict[str, Any]]:
-    """List adapters and their IPs via ifaddr."""
     out: List[Dict[str, Any]] = []
     try:
         for ad in ifaddr.get_adapters():
@@ -59,59 +58,113 @@ def _list_interfaces() -> List[Dict[str, Any]]:
         logging.debug(f"ifaddr error: {e}")
     return out
 
-def _gateway_windows() -> Optional[str]:
+def _default_gateway() -> Optional[str]:
     try:
-        text = subprocess.run(["ipconfig"], capture_output=True, text=True, check=True, encoding='utf-8', errors='replace').stdout
-        for line in text.splitlines():
-            if "Default Gateway" in line:
-                parts = line.split(":")
-                if len(parts) >= 2:
-                    val = parts[1].strip()
-                    if val and val != "0.0.0.0":
-                        return val
-        return None
-    except Exception:
-        return None
-
-def _gateway_unix() -> Optional[str]:
-    for cmd in (["ip", "route"], ["route", "-n"], ["netstat", "-rn"]):
-        try:
-            text = subprocess.run(cmd, capture_output=True, text=True, check=True, encoding='utf-8', errors='replace').stdout
+        if platform.system() == "Windows":
+            text = subprocess.run(["ipconfig"], capture_output=True, text=True, errors='replace').stdout
             for line in text.splitlines():
-                line = line.strip()
-                if not line: continue
-                if "default via" in line:
-                    try:
-                        parts = line.split()
-                        idx = parts.index("via")
-                        return parts[idx + 1]
-                    except Exception:
-                        continue
-                if line.startswith("default") or line.startswith("0.0.0.0"):
-                    parts = line.split()
+                if "Default Gateway" in line:
+                    parts = line.split(":")
                     if len(parts) >= 2:
-                        return parts[1]
-        except Exception:
-            continue
+                        val = parts[1].strip()
+                        if val and val != "0.0.0.0": return val
+        else:
+            cmd = ["ip", "route"] if platform.system() == "Linux" else ["netstat", "-rn"]
+            text = subprocess.run(cmd, capture_output=True, text=True, errors='replace').stdout
+            for line in text.splitlines():
+                if "default" in line or "0.0.0.0" in line:
+                    parts = line.split()
+                    for i, part in enumerate(parts):
+                        if part == "via" and i+1 < len(parts): return parts[i+1]
+                        if part == "default" and i+1 < len(parts): return parts[i+1] 
+    except Exception:
+        pass
     return None
 
-def _default_gateway() -> Optional[str]:
-    if platform.system() == "Windows":
-        return _gateway_windows()
-    return _gateway_unix()
+# --- LAN DISCOVERY & VENDOR LOOKUP ---
+
+def _lookup_mac_vendor(mac_address: str) -> str:
+    """
+    Queries macvendors.co API.
+    """
+    if not mac_address or len(mac_address) < 8:
+        return "Unknown"
+    
+    try:
+        # Simple API call
+        url = f"https://macvendors.co/api/{mac_address}"
+        r = requests.get(url, timeout=1.5) # Fast timeout
+        if r.ok:
+            data = r.json()
+            if "result" in data and "company" in data["result"]:
+                return data["result"]["company"]
+    except:
+        pass
+    return "Unknown"
+
+def get_network_devices() -> Dict[str, List[Dict[str, str]]]:
+    """
+    Reads ARP table and resolves OUI vendors.
+    """
+    devices = {"IPv4": [], "IPv6": []} # List of dicts now
+    osname = platform.system()
+    text = ""
+    
+    # Helpers
+    def _run_safe(cmd):
+        try:
+            res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            return res.stdout
+        except: return ""
+
+    # Get ARP data
+    if osname == "Windows":
+        text = _run_safe(["arp", "-a"])
+    else:
+        text = _run_safe(["ip", "neigh"])
+
+    # Regex for IP and MAC
+    # Windows: 192.168.1.1       xx-xx-xx-xx-xx-xx     dynamic
+    # Linux: 192.168.1.1 dev wlan0 lladdr xx:xx:xx:xx:xx:xx REACHABLE
+    
+    for line in text.splitlines():
+        line = line.strip()
+        if not line: continue
+        
+        # Basic parsing
+        parts = line.split()
+        if len(parts) < 2: continue
+        
+        ip = parts[0]
+        mac = None
+        
+        # Try to find something that looks like a MAC
+        for p in parts:
+            if re.match(r"^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$", p):
+                mac = p
+                break
+        
+        if ip and mac:
+            # Filter junk
+            if ip.startswith("127.") or "224." in ip or "239." in ip or ip == "0.0.0.0": continue
+            
+            # Lookup Vendor
+            vendor = _lookup_mac_vendor(mac)
+            devices["IPv4"].append({"ip": ip, "mac": mac, "vendor": vendor})
+
+    # Sort by IP
+    devices["IPv4"].sort(key=lambda x: x['ip'])
+    return devices
+
+# --- GEO LOOKUP ---
 
 def lookup_target_ip(target: str) -> Dict[str, Any]:
-    """
-    Geo-locate a specific IP address or Domain.
-    """
     try:
-        # Resolve domain to IP if needed
         try:
             target_ip = socket.gethostbyname(target)
         except:
             return {"error": f"Could not resolve domain: {target}"}
 
-        # Use ip-api
         r = requests.get(f"http://ip-api.com/json/{target_ip}", timeout=5)
         if r.ok:
             j = r.json()
@@ -134,10 +187,8 @@ def lookup_target_ip(target: str) -> Dict[str, Any]:
             return {"error": f"API request failed code {r.status_code}"}
     except Exception as e:
         return {"error": str(e)}
-# --- NEW ADDITION END ---
 
 def _public_ip_geo() -> Optional[Dict[str, Any]]:
-    """Use ip-api.com (fast, rich) or fallback."""
     try:
         r = requests.get("http://ip-api.com/json/", timeout=3)
         if r.ok:
@@ -157,13 +208,9 @@ def _public_ip_geo() -> Optional[Dict[str, Any]]:
     return None
 
 def get_quick_identity() -> Dict[str, Any]:
-    """
-    Fast metadata fetch for application startup.
-    """
     local_ip = _best_local_ipv4()
     public = _public_ip_geo()
     
-    # Guess connection type based on the interface holding the local IP
     conn_type = "Unknown"
     if local_ip:
         try:
@@ -183,9 +230,6 @@ def get_quick_identity() -> Dict[str, Any]:
     }
 
 def run_network_metadata_scan(output_queue=None, stop_flag=None, **kwargs):
-    """
-    Full scan returning all interfaces and details.
-    """
     try:
         if stop_flag and getattr(stop_flag, "is_set", lambda: False)():
             return {"status": "stopped"}
