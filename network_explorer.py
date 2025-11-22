@@ -1,6 +1,26 @@
 # network_explorer.py
-# Clean CLI orchestrator with stable colors, tidy summaries, and safe kwarg passing.
-# Python 3.9+ compatible
+# PROGRAM DRIVER SCRIPT
+#
+# Requires Python 3.9+
+#
+# MCLI orchestrator:
+#   - clean summaries
+#   - safe kwarg passing.
+#   - logging setup
+#   - interactive menu
+#   - JSON output
+#   - colorized output
+#   - modular scan selection
+#   - error handling
+#   - auto mode for fast scans
+#   - port scan type selection
+#   - LAN device discovery
+#   - web/dns inspector
+#   - IP/domain lookup
+#   - Wi-Fi geolocation
+#   - Wi-Fi diagnostic dump
+#   - logging pruning
+#   
 
 import argparse
 import json
@@ -15,7 +35,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 try:
     import colorama
-    colorama.init() # Initialize colorama for Windows support
+    colorama.init()
 except ImportError:
     pass
 
@@ -23,9 +43,7 @@ except ImportError:
 from wifi_scan import scan_wifi
 from bluetooth_scan import scan_bluetooth
 from os_security import check_os_security
-# UPDATED: Imported get_network_devices from network_scanner (the Rich version)
 from network_scanner import run_network_metadata_scan, get_quick_identity, lookup_target_ip, get_network_devices
-# UPDATED: Removed get_network_devices from here to avoid conflict
 from port_scanner import run_port_scan 
 from pentest_tools import run_pentest_suite
 
@@ -568,7 +586,7 @@ def main():
         if special_action == "lan_discovery":
             while True:
                 print(f"  {C.MUTED}Scanning local ARP table / Neighbors...{C.RESET}")
-                devs = get_network_devices() # Now using the correct version
+                devs = get_network_devices()
                 print_section("LAN Discovery (ARP/Neighbor)")
                 
                 if devs["IPv4"]:

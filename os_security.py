@@ -1,5 +1,6 @@
 # os_security.py
-# Defensive OS posture checks (Firewall, Antivirus/Defender).
+# Defensive OS posture checks:
+#   - (Firewall, Antivirus/Defender).
 
 import logging
 import platform

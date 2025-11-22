@@ -150,16 +150,16 @@ def _banner(ip: str, port: int, timeout: float = 0.45) -> str:
 # ---------- Public API ----------
 
 def scan_ports(ip: str,
-               start_port: int,
-               end_port: int,
+                start_port: int,
+                end_port: int,
                *,
-               output_queue=None,
-               stop_flag=None,
-               scan_type: str = "top",
-               protocol: str = "tcp",
-               no_banner: bool = True,
-               timeout: float = DEFAULT_TIMEOUT,
-               workers: int = DEFAULT_WORKERS):
+                output_queue=None,
+                stop_flag=None,
+                scan_type: str = "top",
+                protocol: str = "tcp",
+                no_banner: bool = True,
+                timeout: float = DEFAULT_TIMEOUT,
+                workers: int = DEFAULT_WORKERS):
     """
     Concurrent TCP port scan for one host.
     Returns dict: {ip, open_ports{port:banner|True}, duration}.
@@ -220,16 +220,16 @@ def scan_ports(ip: str,
     return {"ip": ip, "open_ports": open_ports, "duration": duration}
 
 def run_port_scan(start_port: int = 1,
-                  end_port: int = 1024,
+                    end_port: int = 1024,
                   *,
-                  scan_type: str = "top",
-                  protocol: str = "tcp",
-                  target_hosts=None,
-                  no_banner: bool = True,
-                  timeout: float = DEFAULT_TIMEOUT,
-                  workers: int = DEFAULT_WORKERS,
-                  output_queue=None,
-                  stop_flag=None):
+                    scan_type: str = "top",
+                    protocol: str = "tcp",
+                    target_hosts=None,
+                    no_banner: bool = True,
+                    timeout: float = DEFAULT_TIMEOUT,
+                    workers: int = DEFAULT_WORKERS,
+                    output_queue=None,
+                    stop_flag=None):
     
     title = f"=== {protocol.upper()} Port Scan ({scan_type}) ==="
     logging.info(title)
